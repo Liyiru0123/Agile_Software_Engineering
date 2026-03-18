@@ -6,8 +6,13 @@
 
 <p>
 Author: {{ $article->author }} |
-Level: {{ $article->level }}
+Level: {{ $article->level }} |
+Subject: {{ $article->subject }}
 </p>
+
+@if($article->source)
+<p>Source: {{ $article->source }}</p>
+@endif
 
 <hr>
 

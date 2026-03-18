@@ -12,11 +12,22 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('articles', function (Blueprint $table) {
-            $table->id();
-            $table->string('title');
-            $table->string('author')->nullable();
-            $table->string('level')->nullable();
+            $table->increments('article_id');
+            $table->enum('subject', [
+                'Civil Engineering',
+                'Mathematics',
+                'Computer Science',
+                'Mechanical Engineering',
+                'Mechanical Engineering with Transportation',
+            ]);
+            $table->string('title', 255);
+            $table->string('slug', 255)->unique();
             $table->text('content');
+            $table->string('author', 100)->nullable();
+            $table->string('source', 255)->nullable();
+            $table->enum('level', ['Easy', 'Intermediate', 'Advanced']);
+            $table->integer('read_count')->default(0);
+            $table->softDeletes();
             $table->timestamps();
         });
     }
