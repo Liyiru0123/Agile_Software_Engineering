@@ -34,8 +34,8 @@ trait LoadsSqlInserts
             foreach ($insertBlocks as $insertSql) {
                 $statement = trim($insertSql);
 
-                if (DB::getDriverName() === 'sqlite') {
-                    $statement = $this->normalizeSqliteStringLiterals($statement);
+                if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+                    $statement = $this->normalizeSqlStringLiterals($statement);
                 }
 
                 DB::unprepared($statement);
@@ -63,12 +63,12 @@ trait LoadsSqlInserts
     }
 
     /**
-     * Normalize unescaped apostrophes in SQL string literals for SQLite.
+    * Normalize unescaped apostrophes in SQL string literals.
      *
      * The source SQL is authored for MySQL and includes natural-language text
      * with apostrophes inside quoted literals; SQLite is stricter here.
      */
-    private function normalizeSqliteStringLiterals(string $statement): string
+    private function normalizeSqlStringLiterals(string $statement): string
     {
         $result = '';
         $inString = false;
