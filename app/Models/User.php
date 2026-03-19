@@ -2,48 +2,62 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Favorite;
+use App\Models\ReadingHistory;
+use App\Models\QuestionAttempt;
+use App\Models\WrongQuestion;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
+    // Primary key configuration
+    protected $primaryKey = 'user_id';
+
+    // Mass assignable attributes
     protected $fillable = [
-        'name',
-        'email',
-        'password',
+        'name', 'email', 'password', 'is_admin'
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
+    // Hidden attributes for serialization
     protected $hidden = [
-        'password',
-        'remember_token',
+        'password', 'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+    // Attribute type casting
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean'
         ];
+    }
+
+    // Relationship: User has many Favorites
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(Favorite::class, 'user_id', 'user_id');
+    }
+
+    // Relationship: User has many ReadingHistories
+    public function readingHistories(): HasMany
+    {
+        return $this->hasMany(ReadingHistory::class, 'user_id', 'user_id');
+    }
+
+    // Relationship: User has many QuestionAttempts
+    public function questionAttempts(): HasMany
+    {
+        return $this->hasMany(QuestionAttempt::class, 'user_id', 'user_id');
+    }
+
+    // Relationship: User has many WrongQuestions
+    public function wrongQuestions(): HasMany
+    {
+        return $this->hasMany(WrongQuestion::class, 'user_id', 'user_id');
     }
 }

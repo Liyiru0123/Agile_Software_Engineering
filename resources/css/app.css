@@ -1,11 +1,79 @@
-@import 'tailwindcss';
+/* Sidebar style optimization */
+.sidebar {
+    z-index: 100;
+    transition: all 0.3s ease;
+}
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
+.sidebar .nav-link.active {
+    border-left: 3px solid #fff;
+}
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+/* Main content area spacing */
+.main-content {
+    margin-left: 240px;
+    padding: 20px;
+    min-height: 100vh;
+}
+
+/* Responsive adaptation */
+@media (max-width: 992px) {
+    .main-content {
+        margin-left: 0;
+        padding: 10px;
+    }
+    
+    .sidebar {
+        transform: translateX(-100%);
+        position: fixed;
+        z-index: 999;
+    }
+    
+    .sidebar.show {
+        transform: translateX(0);
+    }
+}
+
+/* Article content styles */
+.article-content {
+    font-family: 'Arial', sans-serif;
+    color: #333;
+    margin-bottom: 2rem;
+}
+
+.article-content p {
+    margin-bottom: 1rem;
+}
+
+/* Card hover effect */
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+/* Progress bar styles */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+/* Unified button styles */
+.btn {
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Table style optimization */
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+/* Form control style optimization */
+.form-control:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: #80bdff;
 }
