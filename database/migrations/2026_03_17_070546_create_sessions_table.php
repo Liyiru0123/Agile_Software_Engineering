@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('sessions')) {
+            return;
+        }
+
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary(); // Session ID（对应报错里的 WVH1Z8QE8N61...）
             $table->foreignId('user_id')->nullable()->index(); // 关联用户ID（预留）

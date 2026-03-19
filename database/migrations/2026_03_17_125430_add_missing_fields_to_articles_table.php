@@ -12,12 +12,21 @@ return new class extends Migration
     public function up()
     {
         Schema::table('articles', function (Blueprint $table) {
-            $table->text('excerpt')->comment('文章摘要');
-            $table->integer('word_count')->default(0)->comment('单词数');
-            $table->string('author', 100)->default('管理员')->comment('作者');
-            $table->integer('views')->default(0)->comment('阅读量');
-            $table->string('category', 20)->comment('分类（science/life/culture）');
-            $table->string('level', 20)->comment('难度（easy/intermediate/advanced）');
+            if (!Schema::hasColumn('articles', 'excerpt')) {
+                $table->text('excerpt')->nullable()->comment('文章摘要');
+            }
+
+            if (!Schema::hasColumn('articles', 'word_count')) {
+                $table->integer('word_count')->default(0)->comment('单词数');
+            }
+
+            if (!Schema::hasColumn('articles', 'views')) {
+                $table->integer('views')->default(0)->comment('阅读量');
+            }
+
+            if (!Schema::hasColumn('articles', 'category')) {
+                $table->string('category', 20)->nullable()->comment('分类（science/life/culture）');
+            }
         });
     }
 
@@ -27,7 +36,17 @@ return new class extends Migration
     public function down()
     {
         Schema::table('articles', function (Blueprint $table) {
-            $table->dropColumn(['excerpt', 'word_count', 'author', 'views', 'category', 'level']);
+            $dropColumns = [];
+
+            foreach (['excerpt', 'word_count', 'views', 'category'] as $column) {
+                if (Schema::hasColumn('articles', $column)) {
+                    $dropColumns[] = $column;
+                }
+            }
+
+            if (!empty($dropColumns)) {
+                $table->dropColumn($dropColumns);
+            }
         });
     }
 };

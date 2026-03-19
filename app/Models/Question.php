@@ -15,6 +15,7 @@ class Question extends Model
 
     protected $fillable = [
         'article_id',
+        'type',
         'content',
         'options',
         'answer',

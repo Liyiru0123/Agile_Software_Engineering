@@ -11,16 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('question_attempts', function (Blueprint $table) {
+        if (Schema::hasTable('wrong_questions')) {
+            return;
+        }
+
+        Schema::create('wrong_questions', function (Blueprint $table) {
+            $table->increments('wrong_question_id');
             $table->unsignedInteger('user_id');
             $table->unsignedInteger('question_id');
-            $table->string('user_answer', 10);
-            $table->boolean('is_correct');
-            $table->boolean('is_added_wrong')->default(false)->comment('是否加入错题本：0=否，1=是');
-            $table->timestamp('created_at')->nullable()->useCurrent();
-            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+            $table->text('user_answer')->nullable()->comment('用户答题时的答案(JSON格式)');
+            $table->softDeletes();
+            $table->timestamps();
 
-            $table->primary(['user_id', 'question_id']);
+            $table->index('user_id');
             $table->index('question_id');
 
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
@@ -33,6 +36,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('question_attempts');
+        Schema::dropIfExists('wrong_questions');
     }
 };

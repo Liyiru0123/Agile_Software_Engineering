@@ -20,6 +20,8 @@ class QuestionAttempt extends Model
         'question_id',
         'user_answer',
         'is_correct',
+        'is_added_wrong',
         'created_at',
+        'updated_at',
     ];
 }

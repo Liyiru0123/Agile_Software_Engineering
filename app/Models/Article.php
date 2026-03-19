@@ -19,10 +19,14 @@ class Article extends Model
         'title',
         'slug',
         'content',
+        'excerpt',
+        'word_count',
         'author',
         'source',
         'level',
         'read_count',
+        'views',
+        'category',
     ];
 
     public function tags(): BelongsToMany

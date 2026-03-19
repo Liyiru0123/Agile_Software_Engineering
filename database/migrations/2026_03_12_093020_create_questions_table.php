@@ -17,6 +17,7 @@ return new class extends Migration
             $table->text('content');
             $table->json('options')->comment('JSON format: {"A":"option content","B":"option content"...}');
             $table->string('answer', 10);
+            $table->enum('type', ['single', 'multiple'])->default('single')->comment('题目类型：single=单选，multiple=多选');
             $table->text('explanation')->nullable();
             $table->softDeletes();
             $table->timestamps();
