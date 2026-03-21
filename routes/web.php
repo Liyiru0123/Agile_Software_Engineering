@@ -1,12 +1,29 @@
 <?php
 
+use App\Http\Controllers\GuestController;
+use App\Http\Controllers\PracticeController;
+use App\Http\Controllers\StudyProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ArticleController;
 
 Route::get('/', function () {
-    return view('home');
+    return view('welcome');
 });
 
-Route::get('/articles', [ArticleController::class, 'index']);
+Route::get('/dashboard', function () {
+    return redirect('/');
+})->middleware(['auth'])->name('dashboard');
 
-Route::get('/articles/{id}', [ArticleController::class, 'show']);
+Route::get('/choose-identity', function () {
+    return view('choose-identity');
+})->name('identity.choose');
+
+Route::post('/guest/start', [GuestController::class, 'start'])->name('guest.start');
+Route::post('/guest/logout', [GuestController::class, 'logout'])->name('guest.logout');
+
+Route::get('/study-profile', [StudyProfileController::class, 'index'])->name('study.profile');
+
+// 练习模块
+Route::get('/practice', [PracticeController::class, 'show'])->name('practice.show');
+Route::post('/practice/submit', [PracticeController::class, 'submit'])->name('practice.submit');
+
+require __DIR__.'/auth.php';

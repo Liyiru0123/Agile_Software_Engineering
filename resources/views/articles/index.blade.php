@@ -16,7 +16,7 @@ Author: {{ $article->author }} |
 Level: {{ $article->level }}
 </p>
 
-<a href="/articles/{{ $article->id }}" class="btn btn-primary btn-sm">
+<a href="/articles/{{ $article->article_id }}" class="btn btn-primary btn-sm">
 Read
 </a>
 
