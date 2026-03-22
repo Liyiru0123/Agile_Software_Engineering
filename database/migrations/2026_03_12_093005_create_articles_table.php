@@ -6,23 +6,34 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('articles', function (Blueprint $table) {
-            $table->id();
+            $table->increments('article_id');
+            $table->enum('subject', [
+                'Civil Engineering',
+                'Mathematics',
+                'Computer Science',
+                'Mechanical Engineering',
+                'Mechanical Engineering with Transportation',
+            ]);
             $table->string('title');
-            $table->string('author')->nullable();
-            $table->string('level')->nullable();
-            $table->text('content');
-            $table->timestamps();
+            $table->string('slug')->unique();
+            $table->string('audio_url')->nullable();
+            $table->string('video_url')->nullable();
+            $table->string('author', 100)->nullable();
+            $table->string('source')->nullable();
+            $table->enum('level', ['Easy', 'Intermediate', 'Advanced']);
+            $table->enum('accent', ['US', 'UK'])->nullable()->default('US');
+            $table->integer('total_duration')->nullable()->default(0);
+            $table->enum('resource_type', ['text', 'audio', 'video'])->nullable()->default('text');
+            $table->integer('word_count')->default(0);
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->timestamp('deleted_at')->nullable();
         });
     }
-    /**
-     * Reverse the migrations.
-     */
+
     public function down(): void
     {
         Schema::dropIfExists('articles');
