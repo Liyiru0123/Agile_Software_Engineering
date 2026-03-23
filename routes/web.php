@@ -41,3 +41,5 @@ Route::get('/articles/{id}/speaking', function ($id) {
     $article = Article::with('segments')->findOrFail($id);
     return view('articles.speaking', compact('article'));
 })->name('articles.speaking');
+
+Route::get('/articles/{article}/listening', [ArticleController::class, 'listening'])->name('articles.listening');
