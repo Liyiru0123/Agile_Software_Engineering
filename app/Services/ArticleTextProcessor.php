@@ -52,6 +52,122 @@ class ArticleTextProcessor
         'u.k',
     ];
 
+    public function parseSubtitles(string $content, string $format = 'srt'): array
+    {
+        if ($format === 'vtt') {
+            return $this->parseVtt($content);
+        }
+
+        return $this->parseSrt($content);
+    }
+
+    public function parseSrt(string $content): array
+    {
+        $normalized = preg_replace("/\r\n?/", "\n", trim($content));
+        $blocks = preg_split("/\n\s*\n+/u", $normalized) ?: [];
+        $segments = [];
+        $paragraphIndex = 0;
+
+        foreach ($blocks as $block) {
+            $lines = explode("\n", $block);
+            if (count($lines) < 3) {
+                continue;
+            }
+
+            // Line 1 is index, Line 2 is time, Line 3+ is text
+            $timeLine = $lines[1];
+            if (!preg_match('/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/', $timeLine, $matches)) {
+                continue;
+            }
+
+            $startTime = $this->timeToSeconds(str_replace(',', '.', $matches[1]));
+            $endTime = $this->timeToSeconds(str_replace(',', '.', $matches[2]));
+
+            $textLines = array_slice($lines, 2);
+            $text = implode(' ', $textLines);
+            $text = trim(strip_tags($text));
+
+            $segments[] = [
+                'paragraph_index' => $paragraphIndex,
+                'sentence_index' => 0,
+                'content_en' => $text,
+                'content_cn' => null,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+            ];
+            $paragraphIndex++;
+        }
+
+        return $segments;
+    }
+
+    public function parseVtt(string $content): array
+    {
+        $normalized = preg_replace("/\r\n?/", "\n", trim($content));
+        // Remove WEBVTT header
+        $normalized = preg_replace('/^WEBVTT.*?\n\n/s', '', $normalized);
+        $blocks = preg_split("/\n\s*\n+/u", $normalized) ?: [];
+        $segments = [];
+        $paragraphIndex = 0;
+
+        foreach ($blocks as $block) {
+            $lines = explode("\n", $block);
+            if (count($lines) < 2) {
+                continue;
+            }
+
+            $timeLineIndex = 0;
+            if (!str_contains($lines[0], '-->')) {
+                $timeLineIndex = 1;
+            }
+
+            if (!isset($lines[$timeLineIndex])) {
+                continue;
+            }
+
+            $timeLine = $lines[$timeLineIndex];
+            if (!preg_match('/(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})/', $timeLine, $matches)) {
+                continue;
+            }
+
+            $startTime = $this->timeToSeconds($matches[1]);
+            $endTime = $this->timeToSeconds($matches[2]);
+
+            $textLines = array_slice($lines, $timeLineIndex + 1);
+            $text = implode(' ', $textLines);
+            $text = trim(strip_tags($text));
+
+            $segments[] = [
+                'paragraph_index' => $paragraphIndex,
+                'sentence_index' => 0,
+                'content_en' => $text,
+                'content_cn' => null,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+            ];
+            $paragraphIndex++;
+        }
+
+        return $segments;
+    }
+
+    private function timeToSeconds(string $timeString): float
+    {
+        $parts = explode(':', $timeString);
+        $seconds = 0.0;
+        
+        if (count($parts) === 3) {
+            $seconds += (float)$parts[0] * 3600;
+            $seconds += (float)$parts[1] * 60;
+            $seconds += (float)$parts[2];
+        } elseif (count($parts) === 2) {
+            $seconds += (float)$parts[0] * 60;
+            $seconds += (float)$parts[1];
+        }
+
+        return round($seconds, 3);
+    }
+
     public function buildSegments(string $content): array
     {
         $paragraphs = $this->splitParagraphs($content);

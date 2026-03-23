@@ -15,8 +15,8 @@ return new class extends Migration
             $table->unsignedInteger('sentence_index');
             $table->text('content_en');
             $table->text('content_cn')->nullable();
-            $table->integer('start_time')->nullable();
-            $table->integer('end_time')->nullable();
+            $table->decimal('start_time', 8, 3)->nullable();
+            $table->decimal('end_time', 8, 3)->nullable();
 
             $table->index(['article_id', 'paragraph_index'], 'idx_article_segment');
             $table->foreign('article_id')->references('article_id')->on('articles')->cascadeOnDelete();
