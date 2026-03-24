@@ -24,8 +24,8 @@ class ArticleSegment extends Model
     protected $casts = [
         'paragraph_index' => 'integer',
         'sentence_index' => 'integer',
-        'start_time' => 'integer',
-        'end_time' => 'integer',
+        'start_time' => 'float',
+        'end_time' => 'float',
     ];
 
     public function article(): BelongsTo
