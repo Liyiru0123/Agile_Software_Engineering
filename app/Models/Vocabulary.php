@@ -4,9 +4,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Vocabulary extends Model
 {
+    protected $table = 'vocabulary';
+
     protected $fillable = ['word', 'phonetic', 'definition', 'audio_url'];
     
     protected $casts = [
         'created_at' => 'datetime',
     ];
+
+    public $timestamps = false;
 }

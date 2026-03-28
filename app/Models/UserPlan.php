@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserPlan extends Model
 {
+    public $timestamps = false;
     protected $fillable = [
         'user_id', 'article_id', 'plan_date',
         'status', 'completed_at'

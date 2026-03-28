@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Submission extends Model
 {
+    public $timestamps = false;
     protected $fillable = [
         'user_id', 'exercise_id', 'article_id',
         'user_answer', 'score', 'time_spent',

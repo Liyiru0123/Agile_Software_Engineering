@@ -21,4 +21,6 @@ class Article extends Model
     {
         return $this->hasMany(UserFavorite::class);
     }
+
+    public $timestamps = false;
 }

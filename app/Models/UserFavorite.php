@@ -5,9 +5,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserFavorite extends Model
 {
-    protected $fillable = ['user_id', 'article_id'];
-    
     public $timestamps = false;
+    protected $fillable = ['user_id', 'article_id'];
     
     public function user(): BelongsTo
     {

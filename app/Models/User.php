@@ -10,6 +10,12 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    public function favorites()
+    {
+        return $this->belongsToMany(Article::class, 'user_favorites')
+                    ->withPivot('created_at');
+    }
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 

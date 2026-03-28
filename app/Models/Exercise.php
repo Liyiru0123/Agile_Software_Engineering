@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Exercise extends Model
 {
+    public $timestamps = false;
     protected $fillable = ['article_id', 'type', 'question_data', 'answer', 'ai_prompt_id'];
     
     protected $casts = [

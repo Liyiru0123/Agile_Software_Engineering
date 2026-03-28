@@ -1,63 +1,60 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>English Reading - Oral Studio</title>
-    
-    <!-- 1. 引入 Tailwind CSS (红木风的核心引擎) -->
+    <title>@yield('title', 'Academic English')</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 2. 引入 FontAwesome 图标 (播放、麦克风图标) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <!-- 3. 自定义红木主题配置 (Tailwind 扩展) -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        mahogany: '#8B4513',      // 红木主色
-                        darkWood: '#5D2A18',      // 深色木纹
-                        paper: '#FDFBF7',         // 象牙纸张色
-                        silkGold: '#EAD8B1',      // 丝绸金
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-
-<body class="bg-[#F3EFE0]"> <!-- 整个网页背景换成柔和的浅木色 -->
-
-    <!-- 顶栏：沉浸式深木纹导航 -->
-    <nav class="bg-darkWood shadow-lg border-b-2 border-mahogany">
-        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-            <a class="text-silkGold font-serif text-2xl font-bold tracking-tighter hover:opacity-80 transition" href="/">
-                <i class="fas fa-feather-alt mr-2"></i> English Reading
-            </a>
-            
-            <div class="space-x-4">
-                <a class="px-4 py-2 bg-mahogany text-silkGold rounded-lg hover:bg-[#3D1A0D] transition shadow-md font-serif text-sm" href="/articles">
-                    <i class="fas fa-book-open mr-1"></i> Library
+<body class="bg-[#FAF0E6]">
+    
+    <!-- 全局导航栏 - 红木色 -->
+    <nav class="bg-[#4A2C2A] border-b-4 border-[#2C1810] shadow-xl sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <!-- Logo + 标题 -->
+                <a href="{{ route('home') }}" class="flex items-center gap-3 group">
+                    <svg class="w-8 h-8 text-[#C9A961] group-hover:text-[#D4B970] transition" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                    <div>
+                        <h1 class="text-2xl font-serif font-bold text-[#F5E6D3]">Academic English</h1>
+                        <p class="text-xs text-[#C9A961]">Your Learning Journey</p>
+                    </div>
                 </a>
-                <button class="text-silkGold opacity-60 hover:opacity-100 transition">
-                    <i class="fas fa-user-circle text-xl"></i>
-                </button>
+                
+                <!-- 导航链接 -->
+                <div class="flex items-center gap-2 ml-8">
+                    <a href="{{ route('home') }}" 
+                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium
+                              {{ request()->routeIs('home') ? 'bg-[#6B3D2E]' : '' }}">
+                        Dashboard
+                    </a>
+                    <a href="{{ route('articles.index') }}" 
+                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium
+                              {{ request()->routeIs('articles.*') ? 'bg-[#6B3D2E]' : '' }}">
+                        📚 Library
+                    </a>
+                </div>
             </div>
+            
+            <!-- 用户信息 + 登出 -->
+            @auth
+                <div class="flex items-center gap-4">
+                    <span class="text-[#F5E6D3] text-sm font-medium">{{ auth()->user()->name }}</span>
+                    <form method="POST" action="{{ route('logout') }}" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-[#6B3D2E] text-[#F5E6D3] rounded-lg hover:bg-[#8B4D3A] transition font-medium text-sm shadow-md">
+                            Logout
+                        </button>
+                    </form>
+                </div>
+            @endauth
         </div>
     </nav>
-
-    <!-- 主内容区：去除 Bootstrap 的默认容器限制，交给 Tailwind 控制 -->
-    <div class="mt-0">
-        @yield('content')
-    </div>
-
-    <!-- 底部：页脚设计 -->
-    <footer class="py-12 text-center text-gray-500 text-sm font-serif">
-        <div class="h-[1px] w-24 bg-mahogany opacity-20 mx-auto mb-4"></div>
-        &copy; 2026 Academic English Oral Training Studio
-    </footer>
-
+    
+    @yield('content')
+    
+    @stack('scripts')
 </body>
 </html>

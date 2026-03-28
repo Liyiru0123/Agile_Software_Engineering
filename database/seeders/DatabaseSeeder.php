@@ -2,24 +2,21 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            AiPromptSeeder::class,
+            ArticleSeeder::class,
+            VocabularySeeder::class,
         ]);
+        
+        $this->command->info('✅ All test data seeded successfully!');
+        $this->command->info('📚 Articles: ' . \App\Models\Article::count());
+        $this->command->info('📝 Exercises: ' . \App\Models\Exercise::count());
+        $this->command->info('📖 Vocabulary: ' . \App\Models\Vocabulary::count());
     }
 }
