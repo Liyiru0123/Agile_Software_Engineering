@@ -3,11 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- ✅ 添加这行 CSRF meta 标签 -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
     <title>@yield('title', 'Academic English')</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-[#FAF0E6]">
-    
     <!-- 全局导航栏 - 红木色 -->
     <nav class="bg-[#4A2C2A] border-b-4 border-[#2C1810] shadow-xl sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -22,22 +24,22 @@
                         <p class="text-xs text-[#C9A961]">Your Learning Journey</p>
                     </div>
                 </a>
-                
+
                 <!-- 导航链接 -->
                 <div class="flex items-center gap-2 ml-8">
-                    <a href="{{ route('home') }}" 
+                    <a href="{{ route('home') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium
                               {{ request()->routeIs('home') ? 'bg-[#6B3D2E]' : '' }}">
                         Dashboard
                     </a>
-                    <a href="{{ route('articles.index') }}" 
+                    <a href="{{ route('articles.index') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium
                               {{ request()->routeIs('articles.*') ? 'bg-[#6B3D2E]' : '' }}">
                         📚 Library
                     </a>
                 </div>
             </div>
-            
+
             <!-- 用户信息 + 登出 -->
             @auth
                 <div class="flex items-center gap-4">
@@ -52,7 +54,7 @@
             @endauth
         </div>
     </nav>
-    
+
     @yield('content')
     
     @stack('scripts')

@@ -24,12 +24,14 @@ Route::get('/', function () {
         'current_streak' => 0,
     ];
     
-    // 本月计划
+    // 本月计划（用于日历）
     $plans = \App\Models\UserPlan::where('user_id', $user->id)
         ->where('plan_date', 'like', "$currentMonth%")
         ->with('article')
         ->get()
-        ->keyBy('plan_date');
+        ->keyBy(function($plan) {
+            return \Carbon\Carbon::parse($plan->plan_date)->format('Y-m-d');
+        });
     
     // 今天的计划
     $todayPlan = \App\Models\UserPlan::where('user_id', $user->id)
@@ -37,14 +39,14 @@ Route::get('/', function () {
         ->with('article')
         ->first();
     
-    // 最近提交
+    // 最近提交（做题记录）
     $recentSubmissions = \App\Models\Submission::where('user_id', $user->id)
         ->with(['exercise.article'])
-        ->orderBy('id', 'desc')  // 🔥 改用 id 排序，避免 created_at 问题
+        ->orderBy('id', 'desc')
         ->take(5)
         ->get();
     
-    // 待完成计划
+    // 待完成计划（未来）
     $pendingPlans = \App\Models\UserPlan::where('user_id', $user->id)
         ->where('status', 'pending')
         ->where('plan_date', '>=', $today)
@@ -52,14 +54,55 @@ Route::get('/', function () {
         ->orderBy('plan_date')
         ->take(5)
         ->get();
+
+    // 🔥 过期计划日期列表（用于日历标记红色）
+    $expiredPlans = \App\Models\UserPlan::where('user_id', $user->id)
+        ->where('plan_date', '<', $today)
+        ->where('status', 'pending')
+        ->get()
+        ->map(function($plan) {
+            // ✅ 确保日期格式一致
+            return \Carbon\Carbon::parse($plan->plan_date)->format('Y-m-d');
+        })
+        ->toArray();
+
+    // 🔥 过期计划详情列表（用于页面展示）
+    $overduePlans = \App\Models\UserPlan::where('user_id', $user->id)
+        ->where('status', 'pending')
+        ->where('plan_date', '<', $today)
+        ->with('article')
+        ->orderBy('plan_date', 'desc')
+        ->take(5)
+        ->get();
     
-    // 所有文章
+    // 所有文章（用于快速制定计划）
     $articles = \App\Models\Article::orderBy('title')->get();
     
+    // 用户收藏的文章
+    $favoritedArticles = \App\Models\Article::join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
+        ->where('user_favorites.user_id', $user->id)
+        ->select('articles.*', 'user_favorites.created_at as favorited_at')
+        ->orderBy('user_favorites.created_at', 'desc')
+        ->take(6)
+        ->get();
+    
     return view('home', compact(
-        'stats', 'plans', 'todayPlan', 'recentSubmissions', 'pendingPlans', 'articles'
+        'stats', 'plans', 'todayPlan', 'recentSubmissions', 
+        'pendingPlans', 'articles', 'favoritedArticles', 
+        'today', 'currentMonth', 'expiredPlans', 'overduePlans'
     ));
 })->name('home')->middleware('auth');
+
+// ===== 删除计划 =====
+Route::delete('/plans/{plan}', function (\App\Models\UserPlan $plan) {
+    if ($plan->user_id !== auth()->id()) {
+        return response()->json(['error' => 'Unauthorized'], 403);
+    }
+    
+    $plan->delete();
+    
+    return response()->json(['success' => true]);
+})->name('plans.destroy')->middleware('auth');
 
 // ===== 制定/更新计划 =====
 Route::post('/plans', function (\Illuminate\Http\Request $request) {
@@ -106,6 +149,12 @@ Route::patch('/plans/{plan}', function (\Illuminate\Http\Request $request, \App\
 Route::get('/articles', function (\Illuminate\Http\Request $request) {
     $query = \App\Models\Article::query();
     
+    // 🔥 收藏筛选
+    if ($request->filled('favorites') && $request->favorites == '1') {
+        $query->join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
+              ->where('user_favorites.user_id', auth()->id());
+    }
+    
     // 搜索
     if ($request->filled('search')) {
         $search = $request->search;
@@ -124,23 +173,21 @@ Route::get('/articles', function (\Illuminate\Http\Request $request) {
     $sort = $request->get('sort', 'newest');
     switch ($sort) {
         case 'oldest':
-            $query->orderBy('id', 'asc');
+            $query->orderBy('articles.id', 'asc');
             break;
         case 'title':
-            $query->orderBy('title', 'asc');
+            $query->orderBy('articles.title', 'asc');
             break;
         case 'words':
-            $query->orderBy('word_count', 'desc');
+            $query->orderBy('articles.word_count', 'desc');
             break;
         default:
-            $query->orderBy('id', 'desc');
+            $query->orderBy('articles.id', 'desc');
     }
     
     $articles = $query->paginate(10);
     
-    // 🔥 预加载收藏状态：为每篇文章添加 is_favorited 属性
-    $userId = auth()->id();
-// 预加载当前用户的收藏文章 ID
+    // 预加载当前用户的收藏文章 ID
     $favoritedArticleIds = \DB::table('user_favorites')
         ->where('user_id', auth()->id())
         ->pluck('article_id')
@@ -149,7 +196,6 @@ Route::get('/articles', function (\Illuminate\Http\Request $request) {
     return view('articles.index', compact('articles', 'favoritedArticleIds'));
 })->name('articles.index')->middleware('auth');
 
-// 文章详情页
 Route::get('/articles/{article}', function (\App\Models\Article $article) {
     return view('articles.show', compact('article'));
 })->name('articles.show')->middleware('auth');
