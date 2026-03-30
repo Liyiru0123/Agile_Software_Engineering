@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\ListeningTrainingController;
+use App\Http\Controllers\WritingTrainingController;
 
 // ===== 首页（Dashboard）=====
 Route::get('/', function () {
@@ -204,6 +205,7 @@ Route::get('/articles/{article}/speaking', [ArticleController::class, 'speaking'
 Route::get('/articles/{article}/reading', [ArticleController::class, 'reading'])->name('articles.reading')->middleware('auth');
 Route::get('/articles/{article}/writing', [ArticleController::class, 'writing'])->name('articles.writing')->middleware('auth');
 Route::post('/articles/{article}/listening/evaluate', [ListeningTrainingController::class, 'evaluate'])->name('articles.listening.evaluate')->middleware('auth');
+Route::post('/articles/{article}/writing/evaluate', [WritingTrainingController::class, 'evaluate'])->name('articles.writing.evaluate')->middleware('auth');
 
 // ===== 收藏功能路由 =====
 

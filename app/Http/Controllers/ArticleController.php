@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\ListeningExerciseService;
+use App\WritingExerciseService;
 use App\Models\Article;
 use App\Models\Exercise;
 use App\Services\ArticleTextProcessor;
@@ -13,7 +14,8 @@ class ArticleController extends Controller
 {
     public function __construct(
         protected ArticleTextProcessor $processor,
-        protected ListeningExerciseService $listeningExerciseService
+        protected ListeningExerciseService $listeningExerciseService,
+        protected WritingExerciseService $writingExerciseService
     ) {
     }
 
@@ -60,8 +62,10 @@ class ArticleController extends Controller
     public function writing(Article $article): View
     {
         $data = $this->buildPageData($article);
-        $exercise = $article->exercises()->where('type', 'writing')->first();
-        $data['writingTask'] = $this->buildWritingTask($article, $exercise);
+        $data = array_merge($data, $this->writingExerciseService->buildPagePayload(
+            article: $article,
+            userId: auth()->id(),
+        ));
 
         return view('articles.writing', $data);
     }
