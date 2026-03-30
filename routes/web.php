@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\ArticleController;
+use App\Http\Controllers\ListeningTrainingController;
 
 // ===== 首页（Dashboard）=====
 Route::get('/', function () {
@@ -196,9 +198,12 @@ Route::get('/articles', function (\Illuminate\Http\Request $request) {
     return view('articles.index', compact('articles', 'favoritedArticleIds'));
 })->name('articles.index')->middleware('auth');
 
-Route::get('/articles/{article}', function (\App\Models\Article $article) {
-    return view('articles.show', compact('article'));
-})->name('articles.show')->middleware('auth');
+Route::get('/articles/{article}', [ArticleController::class, 'show'])->name('articles.show')->middleware('auth');
+Route::get('/articles/{article}/listening', [ArticleController::class, 'listening'])->name('articles.listening')->middleware('auth');
+Route::get('/articles/{article}/speaking', [ArticleController::class, 'speaking'])->name('articles.speaking')->middleware('auth');
+Route::get('/articles/{article}/reading', [ArticleController::class, 'reading'])->name('articles.reading')->middleware('auth');
+Route::get('/articles/{article}/writing', [ArticleController::class, 'writing'])->name('articles.writing')->middleware('auth');
+Route::post('/articles/{article}/listening/evaluate', [ListeningTrainingController::class, 'evaluate'])->name('articles.listening.evaluate')->middleware('auth');
 
 // ===== 收藏功能路由 =====
 

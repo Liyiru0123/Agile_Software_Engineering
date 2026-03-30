@@ -1,193 +1,242 @@
 @extends('layouts.app')
 
+@section('title', $article->title.' - Listening Training')
+
 @section('content')
-<style>
-    /* 1. 核心高亮样式：阅读时的视觉焦点 */
-    .listening-segment.active {
-        color: #800000; /* Mahogany */
-        background-color: rgba(128, 0, 0, 0.05);
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(128, 0, 0, 0.1);
-        border-radius: 4px;
-    }
-    
-    /* 2. 平滑滚动效果 */
-    .scrolling-container { scroll-behavior: smooth; }
-    
-    /* 3. 进度条平滑过渡 */
-    #progress-bar { transition: width 0.2s linear; }
-</style>
+<div class="min-h-screen bg-[#F6F0E8] py-10">
+    <div class="max-w-5xl mx-auto px-6">
+        <a href="{{ route('articles.show', $article) }}" class="inline-flex items-center text-sm text-[#6B3D2E] hover:text-[#4A2C2A] mb-6">
+            Back to Article
+        </a>
 
-<div class="min-h-screen bg-[#F3EFE0] py-12 pb-40">
-    <div class="container mx-auto px-6 max-w-4xl">
-        
-        <!-- 顶部导航与文章信息 -->
-        <div class="flex justify-between items-center mb-12">
-            <a href="{{ route('articles.show', $article->article_id) }}" class="text-[10px] font-bold uppercase tracking-widest text-mahogany hover:text-black transition-all">
-                <i class="fas fa-times mr-2"></i> Exit Training
-            </a>
-            <div class="text-center">
-                <h1 class="text-3xl font-serif font-bold text-darkWood tracking-tight">{{ $article->title }}</h1>
-                <p class="text-[9px] uppercase tracking-[0.4em] text-mahogany font-bold mt-2 opacity-60">Academic Listening Studio</p>
-            </div>
-            <div class="w-24 text-right border-l border-mahogany/20 pl-4">
-                <div class="text-xl font-serif text-darkWood">{{ count($article->segments) }}</div>
-                <div class="text-[8px] uppercase opacity-40 font-bold tracking-tighter">Segments</div>
-            </div>
-        </div>
-
-        <!-- 主阅读区：自然段接续 -->
-        <div class="bg-white p-16 rounded-[3rem] shadow-2xl border border-silkGold/10 relative overflow-hidden min-h-[600px]">
-            <!-- 装饰性背景水印 -->
-            <div class="absolute top-10 right-10 opacity-[0.03] text-9xl text-mahogany pointer-events-none">
-                <i class="fas fa-headphones"></i>
+        <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8 lg:p-10">
+            <div class="flex flex-wrap items-center gap-3 mb-4">
+                <span class="px-3 py-1 rounded-full bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs font-semibold">{{ $difficultyLabel }}</span>
+                <span class="px-3 py-1 rounded-full bg-[#C9A961]/15 text-[#6B3D2E] text-xs font-semibold">{{ number_format($article->word_count) }} words</span>
+                <span class="px-3 py-1 rounded-full {{ $audioUrl ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }} text-xs font-semibold">
+                    {{ $audioUrl ? 'Audio ready' : 'Text preview only' }}
+                </span>
+                <span class="px-3 py-1 rounded-full {{ $geminiReady ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F3E7D8] text-[#6B3D2E]' }} text-xs font-semibold">
+                    {{ $geminiReady ? 'Gemini-generated' : 'Fallback-generated' }}
+                </span>
             </div>
 
-            <div id="article-content" class="relative z-10 space-y-12">
-                @php
-                    // 按段落对句子进行分组
-                    $paragraphs = $article->segments->groupBy('paragraph_index');
-                @endphp
+            <h1 class="text-3xl font-bold text-[#4A2C2A] mb-3">{{ $article->title }}</h1>
+            <p class="text-[#6B3D2E] leading-7 mb-6">
+                Listen to the audio and type the missing words directly into the passage. When you finish, click Complete to see which answers are correct.
+            </p>
 
-                @forelse($paragraphs as $pIndex => $segments)
-                    <p class="font-serif text-xl leading-[2.4] text-gray-800 text-justify transition-all duration-500">
-                        @foreach($segments as $segment)
-                            <span 
-                                id="segment-{{ $segment->segment_id }}"
-                                data-start="{{ $segment->start_time ?? 0 }}"
-                                data-end="{{ $segment->end_time ?? 0 }}"
-                                class="listening-segment cursor-pointer px-1 transition-all duration-300 hover:bg-silkGold/10"
-                                onclick="seekTo({{ $segment->start_time ?? 0 }})"
-                            >
-                                {{ $segment->content_en }}
-                            </span>
-                        @endforeach
-                    </p>
-                @empty
-                    <!-- 空状态提示 -->
-                    <div class="py-32 text-center">
-                        <i class="fas fa-feather-alt text-5xl text-silkGold/20 mb-6"></i>
-                        <p class="text-gray-400 font-serif italic tracking-widest uppercase text-xs">Waiting for textual data synchronization...</p>
-                    </div>
-                @endforelse
-            </div>
-        </div>
-
-        <!-- 底部浮动控制栏 -->
-        <div class="fixed bottom-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50">
-            @if($article->audio_url)
-                <!-- A. 正常播放器界面 -->
-                <div class="bg-darkWood rounded-2xl shadow-2xl p-6 border border-white/10 flex items-center gap-8 backdrop-blur-md">
-                    <button onclick="togglePlay()" id="play-btn" class="w-14 h-14 bg-mahogany rounded-xl flex items-center justify-center text-silkGold text-xl hover:scale-105 transition-all shadow-lg active:scale-95">
-                        <i class="fas fa-play" id="play-icon"></i>
-                    </button>
-
-                    <div class="flex-grow">
-                        <div class="flex justify-between text-[10px] text-silkGold/40 uppercase tracking-widest mb-2 font-bold font-sans">
-                            <span id="current-time">00:00</span>
-                            <span id="duration-time">--:--</span>
-                        </div>
-                        <div class="h-1.5 bg-white/10 rounded-full overflow-hidden cursor-pointer relative" onclick="seekByBar(event)" id="progress-container">
-                            <div id="progress-bar" class="absolute top-0 left-0 h-full bg-mahogany w-0"></div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-4 text-silkGold/40">
-                        <button onclick="changeSpeed()" id="speed-btn" class="text-[10px] font-bold border border-white/10 px-2 py-1 rounded hover:bg-white/5">1.0x</button>
-                    </div>
-                    
-                    <audio id="main-audio" src="{{ asset($article->audio_url) }}"></audio>
-                </div>
-            @else
-                <!-- B. 本界面提示：无数据状态 (Visual Only) -->
-                <div class="bg-darkWood rounded-2xl shadow-2xl p-6 border border-white/10 flex items-center justify-between border-l-4 border-l-mahogany">
-                    <div class="flex items-center gap-5">
-                        <div class="w-12 h-12 bg-mahogany/20 rounded-xl flex items-center justify-center text-mahogany">
-                            <i class="fas fa-microphone-slash text-lg"></i>
-                        </div>
-                        <div>
-                            <div class="text-silkGold text-[11px] font-bold uppercase tracking-widest">Audio Stream Offline</div>
-                            <div class="text-white/30 text-[9px] uppercase mt-1 tracking-tighter">Waiting for teammate's audio synchronization</div>
-                        </div>
-                    </div>
-                    <div class="px-5 py-2 bg-white/5 rounded-lg text-[9px] text-silkGold/50 font-bold uppercase tracking-widest border border-white/10 italic">
-                        Visual Only Mode
-                    </div>
+            @if(!empty($listeningExercise['note']))
+                <div class="rounded-2xl {{ $geminiReady ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-[#F5EEE6] text-[#6B3D2E] border-[#E0D2C2]' }} border px-4 py-3 text-sm mb-6">
+                    {{ $listeningExercise['note'] }}
                 </div>
             @endif
-        </div>
 
+            @if($audioUrl)
+                <div class="rounded-2xl border border-[#E8D9C9] bg-[#FAF4EC] p-4 mb-8">
+                    <div class="text-sm font-semibold text-[#6B3D2E] mb-2">Source Audio</div>
+                    <audio controls class="w-full">
+                        <source src="{{ $audioUrl }}">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            @else
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800">
+                    This article does not yet have source audio. You can still preview the auto-generated blanks, but full listening practice works best after audio is added.
+                </div>
+            @endif
+
+            <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-6 lg:p-8">
+                <div class="flex items-center justify-between gap-3 mb-6">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.15em] text-[#6B3D2E] font-semibold mb-2">Instruction</div>
+                        <div class="text-sm text-[#3A2A22] leading-6">{{ $listeningExercise['instruction'] }}</div>
+                    </div>
+                    <button id="complete-btn" class="shrink-0 px-5 py-3 rounded-2xl bg-[#6B3D2E] text-white font-semibold">
+                        Complete
+                    </button>
+                </div>
+
+                <div id="listening-passage" class="text-[18px] leading-[3.35rem] text-[#3A2A22]">
+                    @foreach($listeningExercise['items'] as $item)
+                        @php
+                            [$before, $after] = array_pad(explode('_____', $item['context'], 2), 2, '');
+                            $blankChars = max(strlen($item['answer'] ?? ''), 8);
+                        @endphp
+                        <span class="sentence-block inline">
+                            <span>{{ trim($before) }}</span>
+                            <span class="blank-cluster">
+                                <input
+                                    data-answer-id="{{ $item['id'] }}"
+                                    data-blank-chars="{{ $blankChars }}"
+                                    style="width: {{ min($blankChars + 1, 18) }}ch;"
+                                    class="inline-input mx-1.5 px-2 py-1 rounded-xl border border-[#D9C7B5] bg-white text-center text-[#3A2A22] focus:outline-none focus:border-[#6B3D2E]"
+                                    placeholder="..."
+                                    autocomplete="off"
+                                >
+                                <span
+                                    data-result-id="{{ $item['id'] }}"
+                                    class="hidden inline-result px-2 py-1 rounded-lg text-sm"
+                                ></span>
+                            </span>
+                            <span>{{ trim($after) }}</span>
+                        </span>
+                    @endforeach
+                </div>
+            </div>
+
+            <div id="summary-panel" class="hidden mt-6 bg-[#4A2C2A] text-white rounded-3xl p-6 shadow-sm">
+                <div class="text-sm text-[#D7BE8A] mb-1">Score</div>
+                <div id="score-value" class="text-4xl font-bold mb-3">0</div>
+                <div id="summary-text" class="text-sm text-[#F5E6D3]/85 leading-6"></div>
+            </div>
+        </div>
     </div>
 </div>
+@endsection
 
-<script>
-    @if($article->audio_url)
-    const audio = document.getElementById('main-audio');
-    const playIcon = document.getElementById('play-icon');
-    const segments = document.querySelectorAll('.listening-segment');
-    const progressBar = document.getElementById('progress-bar');
-    const speedBtn = document.getElementById('speed-btn');
-
-    // 1. 播放/暂停
-    function togglePlay() {
-        if (audio.paused) { audio.play(); playIcon.className = 'fas fa-pause'; }
-        else { audio.pause(); playIcon.className = 'fas fa-play'; }
+@push('styles')
+<style>
+    .inline-input {
+        min-width: 7rem;
+        max-width: 14rem;
+        height: 2.25rem;
+        line-height: 2.25rem;
+        vertical-align: middle;
     }
 
-    // 2. 实时高亮同步
-    audio.addEventListener('timeupdate', () => {
-        const currentTime = audio.currentTime;
-        
-        // 更新进度条
-        if (audio.duration) {
-            progressBar.style.width = (currentTime / audio.duration * 100) + '%';
-            document.getElementById('current-time').innerText = formatTime(currentTime);
+    .sentence-block {
+        margin-right: 0.5rem;
+    }
+
+    .blank-cluster {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        vertical-align: middle;
+    }
+
+    .inline-result.correct {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .inline-result.incorrect {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .inline-result {
+        display: inline-flex;
+        align-items: center;
+        line-height: 1.1rem;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 640px) {
+        .inline-input {
+            min-width: 6rem;
+            max-width: 11rem;
+            height: 2rem;
+            line-height: 2rem;
         }
 
-        // 寻找并高亮句子
-        segments.forEach(segment => {
-            const start = parseFloat(segment.dataset.start);
-            const end = parseFloat(segment.dataset.end);
+        .blank-cluster {
+            gap: 0.3rem;
+        }
 
-            if (currentTime >= start && currentTime < end) {
-                segment.classList.add('active');
-            } else {
-                segment.classList.remove('active');
-            }
-        });
+        #listening-passage {
+            line-height: 3rem;
+        }
+    }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+const evaluateUrl = @json(route('articles.listening.evaluate', $article));
+const exerciseId = @json($listeningExercise['id']);
+const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+const completeBtn = document.getElementById('complete-btn');
+const summaryPanel = document.getElementById('summary-panel');
+const scoreValue = document.getElementById('score-value');
+const summaryText = document.getElementById('summary-text');
+const startedAt = Date.now();
+const blankInputs = document.querySelectorAll('[data-answer-id]');
+
+blankInputs.forEach((input) => {
+    syncInputWidth(input);
+    input.addEventListener('input', () => syncInputWidth(input));
+});
+
+completeBtn.addEventListener('click', async () => {
+    const answers = { items: {} };
+
+    blankInputs.forEach((input) => {
+        answers.items[input.dataset.answerId] = input.value.trim();
     });
 
-    // 3. 点击跳转
-    function seekTo(time) {
-        audio.currentTime = time;
-        audio.play();
-        playIcon.className = 'fas fa-pause';
-    }
+    completeBtn.disabled = true;
+    completeBtn.textContent = 'Checking...';
 
-    // 4. 进度条点击跳转
-    function seekByBar(e) {
-        const container = document.getElementById('progress-container');
-        const rect = container.getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
-        audio.currentTime = pos * audio.duration;
-    }
+    try {
+        const response = await fetch(evaluateUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                exercise_id: exerciseId,
+                answers,
+                time_spent: Math.round((Date.now() - startedAt) / 1000),
+            }),
+        });
 
-    // 5. 语速调节
-    let currentSpeed = 1.0;
-    function changeSpeed() {
-        const speeds = [1.0, 1.25, 1.5, 0.75];
-        currentSpeed = speeds[(speeds.indexOf(currentSpeed) + 1) % speeds.length];
-        audio.playbackRate = currentSpeed;
-        speedBtn.innerText = currentSpeed + 'x';
+        const data = await response.json();
+        renderResults(data.result);
+    } catch (error) {
+        summaryPanel.classList.remove('hidden');
+        summaryText.textContent = 'Unable to check answers right now.';
+    } finally {
+        completeBtn.disabled = false;
+        completeBtn.textContent = 'Complete';
     }
+});
 
-    function formatTime(s) {
-        return Math.floor(s/60).toString().padStart(2,'0') + ':' + Math.floor(s%60).toString().padStart(2,'0');
-    }
+function renderResults(result) {
+    scoreValue.textContent = result.score;
+    summaryText.textContent = `${result.correct_count} of ${result.total_count} blanks are correct. ${result.summary}`;
+    summaryPanel.classList.remove('hidden');
 
-    audio.onloadedmetadata = () => {
-        document.getElementById('duration-time').innerText = formatTime(audio.duration);
-    };
-    @endif
+    result.item_results.forEach((item) => {
+        const resultBox = document.querySelector(`[data-result-id="${item.id}"]`);
+        if (!resultBox) {
+            return;
+        }
+
+        resultBox.classList.remove('hidden', 'correct', 'incorrect');
+
+        if (item.is_correct) {
+            resultBox.classList.add('correct');
+            resultBox.textContent = 'Correct';
+            return;
+        }
+
+        resultBox.classList.add('incorrect');
+        resultBox.textContent = `Wrong: ${item.expected}`;
+    });
+}
+
+function syncInputWidth(input) {
+    const baseChars = Number(input.dataset.blankChars || 8);
+    const typedChars = input.value.trim().length + 1;
+    const widthChars = Math.max(baseChars + 1, typedChars, 8);
+    const maxChars = window.innerWidth <= 640 ? 14 : 18;
+
+    input.style.width = `${Math.min(widthChars, maxChars)}ch`;
+}
 </script>
-@endsection
+@endpush

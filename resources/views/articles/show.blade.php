@@ -1,106 +1,76 @@
 @extends('layouts.app')
 
+@section('title', $article->title.' - Article Detail')
+
 @section('content')
-<div class="min-h-screen bg-[#F3EFE0] py-12">
-    <div class="container mx-auto px-6 max-w-6xl">
-        
-        <!-- 1. 返回导航 -->
-        <a href="{{ route('articles.index') }}" class="inline-flex items-center text-[10px] font-bold uppercase tracking-widest text-mahogany hover:text-black mb-12 transition-colors group">
-            <i class="fas fa-arrow-left mr-2 transform group-hover:-translate-x-1 transition-transform"></i> Back to Library
+<div class="min-h-screen bg-[#F6F0E8] py-10">
+    <div class="max-w-7xl mx-auto px-6">
+        <a href="{{ route('articles.index') }}" class="inline-flex items-center text-sm text-[#6B3D2E] hover:text-[#4A2C2A] mb-6">
+            Back to Library
         </a>
 
-        <div class="flex flex-col lg:flex-row gap-12">
-            
-            <!-- A. 左侧：沉浸式阅读区 (Main Content) -->
-            <div class="lg:w-2/3">
-                <div class="bg-white p-12 rounded-[2.5rem] shadow-xl border border-silkGold/10 relative overflow-hidden">
-                    <!-- 背景装饰水印 -->
-                    <div class="absolute top-8 right-8 text-silkGold/10 text-6xl opacity-20"><i class="fas fa-quote-right"></i></div>
-                    
-                    <header class="mb-12 border-b border-silkGold/10 pb-8 relative z-10">
-                        <div class="text-[10px] text-mahogany font-bold uppercase tracking-[0.3em] mb-3 opacity-60">Full Text Selection</div>
-                        <h1 class="text-4xl font-serif font-bold text-darkWood mb-4 leading-tight">{{ $article->title }}</h1>
-                        <div class="flex flex-wrap gap-4 text-xs text-gray-400 font-serif italic">
-                            <span>By {{ $article->author }}</span>
-                            <span>•</span>
-                            <span>{{ $article->subject }}</span>
-                            <span>•</span>
-                            <span>{{ number_format($article->word_count) }} Words</span>
-                        </div>
-                    </header>
-
-                    <!-- 文章正文：保留换行并优化排版 -->
-                    <div class="font-serif text-lg text-gray-700 leading-loose space-y-8 relative z-10">
-                        {!! nl2br(e($article->content)) !!}
-                    </div>
+        <div class="grid lg:grid-cols-[minmax(0,1.5fr)_380px] gap-8 items-start">
+            <section class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8 lg:p-10">
+                <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <span class="px-3 py-1 rounded-full bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs font-semibold">
+                        {{ $difficultyLabel }}
+                    </span>
+                    <span class="px-3 py-1 rounded-full bg-[#C9A961]/15 text-[#6B3D2E] text-xs font-semibold">
+                        {{ number_format($article->word_count) }} words
+                    </span>
+                    <span class="px-3 py-1 rounded-full bg-[#4A2C2A]/10 text-[#4A2C2A] text-xs font-semibold">
+                        {{ $estimatedMinutes }} min read
+                    </span>
+                    <span class="px-3 py-1 rounded-full {{ $audioUrl ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }} text-xs font-semibold">
+                        {{ $audioUrl ? 'Source audio available' : 'No source audio yet' }}
+                    </span>
                 </div>
-            </div>
 
-            <!-- B. 右侧：训练模式切换 (Training Sidebar) -->
-            <div class="lg:w-1/3 space-y-8">
-                <div class="sticky top-12">
-                    <h2 class="text-[10px] font-bold uppercase tracking-[0.4em] text-mahogany opacity-40 mb-8 px-2">Choose Training Mode</h2>
-                    
-                    <!-- 模式 1：口语练习 (Speaking Practice) -->
-                    <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-silkGold/10 group mb-8 transition-all hover:-translate-y-1">
-                        <div class="flex items-center gap-5 mb-6">
-                            <div class="w-14 h-14 bg-mahogany rounded-2xl flex items-center justify-center text-silkGold shadow-lg group-hover:scale-110 transition-transform">
-                                <i class="fas fa-microphone-alt text-xl"></i>
-                            </div>
-                            <h3 class="text-xl font-serif font-bold text-darkWood">Speaking Practice</h3>
+                <h1 class="text-4xl font-bold text-[#4A2C2A] mb-4 leading-tight">{{ $article->title }}</h1>
+                <p class="text-[#6B3D2E] text-lg leading-8 mb-8">{{ $articleSummary }}</p>
+
+                @if($audioUrl)
+                    <div class="mb-8 p-4 rounded-2xl bg-[#FAF4EC] border border-[#E8D9C9]">
+                        <div class="text-sm text-[#6B3D2E] font-semibold mb-2">Article Audio</div>
+                        <audio controls class="w-full">
+                            <source src="{{ $audioUrl }}">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                @endif
+
+                <div class="space-y-6 text-[#3A2A22] leading-8 text-[17px]">
+                    @foreach($paragraphs as $paragraph)
+                        <p>{{ $paragraph }}</p>
+                    @endforeach
+                </div>
+            </section>
+
+            <aside class="space-y-5 sticky top-24">
+                <div class="bg-[#4A2C2A] text-white rounded-3xl p-6 shadow-lg">
+                    <div class="text-xs uppercase tracking-[0.25em] text-[#D7BE8A] mb-3">Training Hub</div>
+                    <h2 class="text-2xl font-bold mb-2">Choose a skill to train</h2>
+                    <p class="text-sm text-[#F5E6D3]/80 leading-6">
+                        Start with the full article, then switch into listening, speaking, reading, or writing practice. The listening page already supports AI exercise generation, scoring, and speech recognition.
+                    </p>
+                </div>
+
+                @foreach($trainingCards as $card)
+                    <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-6">
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                            <h3 class="text-xl font-bold text-[#4A2C2A]">{{ $card['title'] }}</h3>
+                            <span class="text-[11px] px-2 py-1 rounded-full bg-[#F3E7D8] text-[#6B3D2E] font-semibold">
+                                {{ $card['status'] }}
+                            </span>
                         </div>
-                        <p class="text-xs text-gray-500 leading-relaxed mb-8 font-serif italic">
-                            Record your voice, analyze sentences, and master the {{ $article->accent }} accent through repetitive practice.
-                        </p>
-                        <a href="{{ route('articles.speaking', $article->article_id) }}" class="block w-full text-center py-4 bg-mahogany text-silkGold text-[10px] font-bold uppercase tracking-[0.2em] rounded-xl hover:bg-black transition-all shadow-md">
-                            Start Speaking Now
+                        <p class="text-sm text-[#6B3D2E] leading-6 mb-5">{{ $card['description'] }}</p>
+                        <a href="{{ $card['route'] }}"
+                           class="inline-flex items-center justify-center w-full rounded-2xl bg-[#6B3D2E] hover:bg-[#4A2C2A] text-white px-4 py-3 font-semibold transition">
+                            {{ $card['cta'] }}
                         </a>
                     </div>
-
-                    <!-- 模式 2：听力训练 (Listening Training) - 强制开启版 -->
-                    <div class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-silkGold/10 group mb-8 transition-all hover:-translate-y-1">
-                        <div class="flex items-center gap-5 mb-6">
-                            <div class="w-14 h-14 bg-mahogany rounded-2xl flex items-center justify-center text-silkGold shadow-lg group-hover:scale-110 transition-transform">
-                                <i class="fas fa-headphones-alt text-xl"></i>
-                            </div>
-                            <div class="flex-grow">
-                                <h3 class="text-xl font-serif font-bold text-darkWood">Listening Training</h3>
-                                @if(!$article->audio_url)
-                                    <span class="text-[8px] uppercase font-bold text-mahogany tracking-widest block mt-1 opacity-40">Preview Mode</span>
-                                @endif
-                            </div>
-                        </div>
-                        <p class="text-xs text-gray-500 leading-relaxed mb-8 font-serif italic">
-                            Focus on phonetics and rhythm. Follow the original source to improve your comprehension and speed in a seamless reading flow.
-                        </p>
-
-                        <!-- 不论有没有音频，按钮永远是激活状态，允许进入 preview -->
-                        <a href="{{ route('articles.listening', $article->article_id) }}" class="block w-full text-center py-4 bg-mahogany text-silkGold text-[10px] font-bold uppercase tracking-[0.2em] rounded-xl hover:bg-black transition-all shadow-md">
-                            Enter Listening Mode
-                        </a>
-                    </div>
-
-                    <!-- 底部规格卡片 (Academic Specs) -->
-                    <div class="p-8 bg-darkWood rounded-[2.5rem] text-silkGold shadow-2xl relative overflow-hidden group">
-                        <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
-                        <div class="relative z-10">
-                            <div class="text-[9px] uppercase font-bold tracking-[0.3em] opacity-40 mb-6 italic">Academic Specs</div>
-                            <div class="flex justify-between items-end">
-                                <div>
-                                    <div class="text-3xl font-bold font-serif leading-none">{{ $article->accent }}</div>
-                                    <div class="text-[8px] uppercase opacity-40 font-bold mt-2 tracking-widest">Target Accent</div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-2xl font-bold font-serif leading-none text-mahogany/80">{{ $article->level }}</div>
-                                    <div class="text-[8px] uppercase opacity-40 font-bold mt-2 tracking-widest">Proficiency</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
+                @endforeach
+            </aside>
         </div>
     </div>
 </div>
