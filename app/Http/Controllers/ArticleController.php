@@ -32,8 +32,10 @@ class ArticleController extends Controller
     public function listening(Article $article): View
     {
         $data = $this->buildPageData($article);
-        $data['listeningExercise'] = $this->listeningExerciseService->generateForArticle($article);
-        $data['geminiReady'] = filled(config('services.gemini.api_key'));
+        $data['listeningExercise'] = $this->listeningExerciseService->getForArticle(
+            $article,
+            request()->user()?->id
+        );
 
         return view('articles.listening', $data);
     }

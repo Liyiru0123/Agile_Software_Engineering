@@ -5,53 +5,47 @@ namespace App;
 use App\Models\Article;
 use App\Models\Exercise;
 use App\Models\Submission;
-use App\Services\ArticleTextProcessor;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 
 class ListeningExerciseService
 {
-    private const LOGIC_CONNECTORS = [
-        'however', 'therefore', 'moreover', 'furthermore', 'consequently', 'although',
-        'because', 'while', 'whereas', 'thus', 'instead', 'meanwhile', 'overall',
-        'for example', 'for instance', 'in contrast', 'as a result', 'in addition',
-    ];
-
-    public function __construct(
-        protected ArticleTextProcessor $processor
-    ) {
-    }
-
-    public function generateForArticle(Article $article): array
+    public function getForArticle(Article $article, ?int $userId = null): ?array
     {
-        $fallback = $this->buildFallbackExercise($article);
-        $exercisePayload = $this->generateWithGemini($article) ?? $fallback;
+        $exercise = $article->exercises()
+            ->where('type', 'listening')
+            ->orderBy('id')
+            ->first();
 
-        $exercise = Exercise::query()->create([
-            'article_id' => $article->id,
-            'type' => 'listening',
-            'question_data' => [
-                'instruction' => $exercisePayload['instruction'],
-                'passage' => $exercisePayload['passage'],
-                'items' => $exercisePayload['items'],
-                'provider' => $exercisePayload['provider'],
-                'note' => $exercisePayload['note'] ?? null,
-            ],
-            'answer' => [
-                'items' => collect($exercisePayload['items'])
-                    ->mapWithKeys(fn (array $item) => [$item['id'] => $item['accepted_answers']])
-                    ->all(),
-            ],
-        ]);
+        if (! $exercise) {
+            return null;
+        }
 
-        return [
-            'id' => $exercise->id,
-            'instruction' => $exercisePayload['instruction'],
-            'passage' => $exercisePayload['passage'],
-            'items' => $exercisePayload['items'],
-            'provider' => $exercisePayload['provider'],
-            'note' => $exercisePayload['note'] ?? null,
-        ];
+        $normalizedExercise = $this->formatExercise($exercise);
+
+        if (! $normalizedExercise) {
+            return null;
+        }
+
+        if ($userId) {
+            $latestSubmission = Submission::query()
+                ->where('user_id', $userId)
+                ->where('exercise_id', $exercise->id)
+                ->where('article_id', $article->id)
+                ->orderByDesc('id')
+                ->first();
+
+            if ($latestSubmission) {
+                $normalizedExercise['latest_submission'] = [
+                    'answers' => $latestSubmission->user_answer['items'] ?? [],
+                    'result' => $this->buildResultFromAnswers(
+                        $normalizedExercise['items'],
+                        $latestSubmission->user_answer['items'] ?? []
+                    ),
+                    'submitted_at' => optional($latestSubmission->created_at)?->toIso8601String(),
+                ];
+            }
+        }
+
+        return $normalizedExercise;
     }
 
     public function evaluateSubmission(
@@ -61,11 +55,41 @@ class ListeningExerciseService
         ?int $userId = null,
         int $timeSpent = 0
     ): array {
-        $questionData = $exercise->question_data ?? [];
-        $items = collect($questionData['items'] ?? []);
-        $userItemAnswers = collect($answers['items'] ?? []);
+        $normalizedExercise = $this->formatExercise($exercise);
+        $result = $this->buildResultFromAnswers(
+            $normalizedExercise['items'] ?? [],
+            $answers['items'] ?? []
+        );
 
-        $itemResults = $items->map(function (array $item) use ($userItemAnswers) {
+        if ($userId) {
+            Submission::query()->create([
+                'user_id' => $userId,
+                'exercise_id' => $exercise->id,
+                'article_id' => $article->id,
+                'user_answer' => [
+                    'items' => $answers['items'] ?? [],
+                ],
+                'score' => $result['score'],
+                'time_spent' => $timeSpent,
+                'attempt_count' => 1,
+                'ai_advice' => [
+                    'provider' => 'database-check',
+                    'summary' => $result['correct_count'] === $result['total_count']
+                        ? 'All blanks were completed correctly.'
+                        : 'Review the incorrect blanks and compare them with the source audio.',
+                ],
+            ]);
+        }
+
+        return $result;
+    }
+
+    protected function buildResultFromAnswers(array $items, array $rawAnswers): array
+    {
+        $itemCollection = collect($items);
+        $userItemAnswers = collect($rawAnswers);
+
+        $itemResults = $itemCollection->map(function (array $item) use ($userItemAnswers) {
             $userAnswer = trim((string) $userItemAnswers->get((string) $item['id'], ''));
             $acceptedAnswers = collect($item['accepted_answers'] ?? [])
                 ->map(fn ($value) => $this->normalize((string) $value))
@@ -90,26 +114,6 @@ class ListeningExerciseService
         $correctCount = $itemResults->where('is_correct', true)->count();
         $score = round(($correctCount / $questionCount) * 100, 2);
 
-        if ($userId) {
-            Submission::query()->create([
-                'user_id' => $userId,
-                'exercise_id' => $exercise->id,
-                'article_id' => $article->id,
-                'user_answer' => [
-                    'items' => $userItemAnswers->all(),
-                ],
-                'score' => $score,
-                'time_spent' => $timeSpent,
-                'attempt_count' => 1,
-                'ai_advice' => [
-                    'provider' => 'local-check',
-                    'summary' => $correctCount === $questionCount
-                        ? 'All blanks were completed correctly.'
-                        : 'Review the incorrect blanks and compare them with the source audio.',
-                ],
-            ]);
-        }
-
         return [
             'score' => $score,
             'correct_count' => $correctCount,
@@ -121,200 +125,109 @@ class ListeningExerciseService
         ];
     }
 
-    protected function buildFallbackExercise(Article $article): array
+    protected function formatExercise(Exercise $exercise): ?array
     {
-        $paragraphs = $this->processor->splitParagraphs($article->content);
-        $sentences = collect($paragraphs)
-            ->flatMap(fn (string $paragraph) => $this->processor->splitSentences($paragraph))
-            ->filter()
-            ->values();
+        $questionData = $exercise->question_data ?? [];
+        $items = $this->normalizeItems($questionData, $exercise->answer ?? []);
 
-        $passageSentences = $sentences->take(4)->values();
-        $passage = $passageSentences->implode(' ');
-        $usedContexts = [];
-        $items = [];
-
-        foreach ($passageSentences as $sentence) {
-            $candidate = $this->buildBlankFromSentence($sentence, $usedContexts, count($items) + 1);
-
-            if ($candidate) {
-                $items[] = $candidate;
-            }
-
-            if (count($items) >= 5) {
-                break;
-            }
-        }
-
-        if (count($items) < 3) {
-            $items = array_merge($items, $this->buildBackupItems($passageSentences, count($items) + 1));
-            $items = array_slice($items, 0, 5);
+        if ($items === []) {
+            return null;
         }
 
         return [
-            'provider' => filled(config('services.gemini.api_key')) ? 'fallback-after-gemini-error' : 'local-fallback',
-            'instruction' => 'Listen to the audio and fill in the missing words or phrases.',
-            'passage' => $passage,
-            'items' => array_values($items),
-            'note' => filled(config('services.gemini.api_key'))
-                ? 'Gemini generation failed, so a fallback gap-fill exercise was created locally.'
-                : 'Gemini is not configured, so a fallback gap-fill exercise was created locally.',
+            'id' => $exercise->id,
+            'instruction' => $questionData['instruction'] ?? 'Listen to the audio and fill in the missing words or phrases.',
+            'items' => $items,
+            'note' => $questionData['note'] ?? null,
         ];
     }
 
-    protected function buildBlankFromSentence(string $sentence, array &$usedContexts, int $id): ?array
+    protected function normalizeItems(array $questionData, mixed $answerData): array
     {
-        $logic = $this->matchFirst($sentence, self::LOGIC_CONNECTORS);
-        if ($logic) {
-            return $this->makeItem($id, 'Logic connector', $sentence, $logic, $usedContexts);
+        $rawItems = [];
+
+        if (is_array($questionData['items'] ?? null)) {
+            $rawItems = $questionData['items'];
+        } elseif (is_array($questionData['blanks'] ?? null)) {
+            $rawItems = $questionData['blanks'];
         }
 
-        if (preg_match('/\b\d+(?:\.\d+)?%?\b/', $sentence, $matches) === 1) {
-            return $this->makeItem($id, 'Data point', $sentence, $matches[0], $usedContexts);
-        }
+        return collect($rawItems)
+            ->map(function (array $item, int $index) use ($answerData) {
+                $id = (string) ($item['id'] ?? $item['index'] ?? $index + 1);
+                $acceptedAnswers = $this->resolveAcceptedAnswers($id, $item, $answerData, $index);
+                $primaryAnswer = $acceptedAnswers[0] ?? trim((string) ($item['answer'] ?? ''));
+                $context = trim((string) ($item['context'] ?? ''));
 
-        preg_match_all("/\b[A-Za-z][A-Za-z'-]{6,}\b/", $sentence, $matches);
-        $keyword = collect($matches[0] ?? [])
-            ->reject(fn (string $word) => in_array(strtolower($word), ['throughout', 'because', 'however', 'therefore'], true))
-            ->first();
+                if ($context === '' || substr_count($context, '_____') !== 1 || $primaryAnswer === '') {
+                    return null;
+                }
 
-        if ($keyword) {
-            return $this->makeItem($id, 'Academic keyword', $sentence, $keyword, $usedContexts);
-        }
-
-        return null;
+                return [
+                    'id' => $id,
+                    'label' => (string) ($item['label'] ?? 'Blank '.$id),
+                    'context' => $context,
+                    'answer' => $primaryAnswer,
+                    'accepted_answers' => $acceptedAnswers,
+                    'hint' => $item['hint'] ?? null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
-    protected function buildBackupItems(Collection $sentences, int $startingId): array
+    protected function resolveAcceptedAnswers(string $id, array $item, mixed $answerData, int $index): array
     {
-        $items = [];
-        $usedContexts = [];
+        $answers = collect();
 
-        foreach ($sentences as $sentence) {
-            preg_match_all("/\b[A-Za-z][A-Za-z'-]{5,}\b/", $sentence, $matches);
-            $word = collect($matches[0] ?? [])->first();
+        if (is_array($item['accepted_answers'] ?? null)) {
+            $answers = $answers->merge($item['accepted_answers']);
+        }
 
-            if (! $word) {
+        if (filled($item['answer'] ?? null)) {
+            $answers->push($item['answer']);
+        }
+
+        $answerLookup = $this->extractAnswerLookup($answerData);
+
+        foreach ([$id, (string) ($index + 1), $index + 1, $item['index'] ?? null, (string) ($item['index'] ?? '')] as $key) {
+            if ($key === null || $key === '') {
                 continue;
             }
 
-            $candidate = $this->makeItem($startingId + count($items), 'Key word', $sentence, $word, $usedContexts);
+            if (! array_key_exists($key, $answerLookup)) {
+                continue;
+            }
 
-            if ($candidate) {
-                $items[] = $candidate;
+            $storedAnswer = $answerLookup[$key];
+
+            if (is_array($storedAnswer)) {
+                $answers = $answers->merge($storedAnswer);
+            } else {
+                $answers->push($storedAnswer);
             }
         }
 
-        return $items;
+        return $answers
+            ->filter(fn ($value) => filled($value))
+            ->map(fn ($value) => trim((string) $value))
+            ->unique()
+            ->values()
+            ->all();
     }
 
-    protected function makeItem(int $id, string $label, string $sentence, string $answer, array &$usedContexts): ?array
+    protected function extractAnswerLookup(mixed $answerData): array
     {
-        $pattern = '/'.preg_quote($answer, '/').'/i';
-        $context = preg_replace($pattern, '_____', $sentence, 1);
-        $context = trim((string) preg_replace('/\s+/', ' ', $context ?? ''));
-
-        if ($context === '' || in_array($context, $usedContexts, true)) {
-            return null;
+        if (! is_array($answerData)) {
+            return [];
         }
 
-        $usedContexts[] = $context;
-
-        return [
-            'id' => (string) $id,
-            'label' => $label,
-            'context' => $context,
-            'answer' => $answer,
-            'accepted_answers' => [$answer, strtolower($answer)],
-        ];
-    }
-
-    protected function generateWithGemini(Article $article): ?array
-    {
-        if (! filled(config('services.gemini.api_key'))) {
-            return null;
+        if (is_array($answerData['items'] ?? null)) {
+            return $answerData['items'];
         }
 
-        $prompt = <<<PROMPT
-You are generating an academic English listening gap-fill exercise.
-
-Return valid JSON only with this shape:
-{
-  "instruction": "string",
-  "passage": "string",
-  "items": [
-    {
-      "id": "1",
-      "label": "string",
-      "context": "string with exactly one blank written as _____",
-      "answer": "string",
-      "accepted_answers": ["string", "string"]
-    }
-  ]
-}
-
-Rules:
-- Use the article text below.
-- Create 4 to 5 high-quality listening blanks.
-- Prioritize academic keywords, core claims, logical connectors, and result expressions.
-- The passage should be a short excerpt from the article, suitable as a listening clip.
-- Each item must contain exactly one blank.
-- accepted_answers should include lowercase-safe variants.
-
-Article title: {$article->title}
-Article content:
-{$article->content}
-PROMPT;
-
-        try {
-            $response = Http::timeout(60)
-                ->post(
-                    rtrim(config('services.gemini.base_url'), '/').'/'.config('services.gemini.model').':generateContent?key='.config('services.gemini.api_key'),
-                    [
-                        'contents' => [
-                            ['parts' => [['text' => $prompt]]],
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.3,
-                            'responseMimeType' => 'application/json',
-                        ],
-                    ]
-                )
-                ->throw();
-
-            $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
-            $decoded = $this->decodeJsonPayload($text);
-
-            if (! is_array($decoded) || ! isset($decoded['instruction'], $decoded['passage'], $decoded['items']) || ! is_array($decoded['items'])) {
-                return null;
-            }
-
-            $decoded['provider'] = 'gemini';
-            $decoded['note'] = 'This gap-fill exercise was generated automatically by Gemini.';
-            $decoded['items'] = collect($decoded['items'])
-                ->map(function (array $item, int $index) {
-                    $item['id'] = (string) ($item['id'] ?? $index + 1);
-                    $item['accepted_answers'] = collect($item['accepted_answers'] ?? [$item['answer'] ?? ''])
-                        ->filter()
-                        ->map(fn ($answer) => trim((string) $answer))
-                        ->push(strtolower((string) ($item['answer'] ?? '')))
-                        ->unique()
-                        ->values()
-                        ->all();
-
-                    return $item;
-                })
-                ->filter(fn (array $item) => isset($item['context'], $item['answer']) && substr_count($item['context'], '_____') === 1)
-                ->take(5)
-                ->values()
-                ->all();
-
-            return count($decoded['items']) >= 3 ? $decoded : null;
-        } catch (\Throwable $exception) {
-            report($exception);
-
-            return null;
-        }
+        return $answerData;
     }
 
     protected function normalize(string $value): string
@@ -323,34 +236,5 @@ PROMPT;
         $value = preg_replace('/[^a-z0-9%.\s-]/', '', $value) ?? '';
 
         return trim((string) preg_replace('/\s+/', ' ', $value));
-    }
-
-    protected function matchFirst(string $sentence, array $needles): ?string
-    {
-        foreach ($needles as $needle) {
-            if (stripos($sentence, $needle) !== false) {
-                return $needle;
-            }
-        }
-
-        return null;
-    }
-
-    protected function decodeJsonPayload(?string $text): ?array
-    {
-        if (! is_string($text) || trim($text) === '') {
-            return null;
-        }
-
-        $trimmed = trim($text);
-
-        if (str_starts_with($trimmed, '```')) {
-            $trimmed = preg_replace('/^```json|^```|```$/m', '', $trimmed) ?? $trimmed;
-            $trimmed = trim($trimmed);
-        }
-
-        $decoded = json_decode($trimmed, true);
-
-        return is_array($decoded) ? $decoded : null;
     }
 }

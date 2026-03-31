@@ -16,8 +16,8 @@
                 <span class="px-3 py-1 rounded-full {{ $audioUrl ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' }} text-xs font-semibold">
                     {{ $audioUrl ? 'Audio ready' : 'Text preview only' }}
                 </span>
-                <span class="px-3 py-1 rounded-full {{ $geminiReady ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F3E7D8] text-[#6B3D2E]' }} text-xs font-semibold">
-                    {{ $geminiReady ? 'Gemini-generated' : 'Fallback-generated' }}
+                <span class="px-3 py-1 rounded-full {{ $listeningExercise ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-600' }} text-xs font-semibold">
+                    {{ $listeningExercise ? 'Database exercise' : 'No exercise configured' }}
                 </span>
             </div>
 
@@ -26,9 +26,15 @@
                 Listen to the audio and type the missing words directly into the passage. When you finish, click Complete to see which answers are correct.
             </p>
 
-            @if(!empty($listeningExercise['note']))
-                <div class="rounded-2xl {{ $geminiReady ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-[#F5EEE6] text-[#6B3D2E] border-[#E0D2C2]' }} border px-4 py-3 text-sm mb-6">
+            @if($listeningExercise && !empty($listeningExercise['note']))
+                <div class="rounded-2xl bg-[#F5EEE6] text-[#6B3D2E] border border-[#E0D2C2] px-4 py-3 text-sm mb-6">
                     {{ $listeningExercise['note'] }}
+                </div>
+            @endif
+
+            @if(!empty($listeningExercise['latest_submission']))
+                <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 mb-6">
+                    Your latest listening attempt has been restored. You can review it directly or update your answers and submit again.
                 </div>
             @endif
 
@@ -47,42 +53,49 @@
             @endif
 
             <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-6 lg:p-8">
-                <div class="flex items-center justify-between gap-3 mb-6">
-                    <div>
-                        <div class="text-xs uppercase tracking-[0.15em] text-[#6B3D2E] font-semibold mb-2">Instruction</div>
-                        <div class="text-sm text-[#3A2A22] leading-6">{{ $listeningExercise['instruction'] }}</div>
+                @if($listeningExercise)
+                    <div class="flex items-center justify-between gap-3 mb-6">
+                        <div>
+                            <div class="text-xs uppercase tracking-[0.15em] text-[#6B3D2E] font-semibold mb-2">Instruction</div>
+                            <div class="text-sm text-[#3A2A22] leading-6">{{ $listeningExercise['instruction'] }}</div>
+                        </div>
+                        <button id="complete-btn" class="shrink-0 px-5 py-3 rounded-2xl bg-[#6B3D2E] text-white font-semibold">
+                            Complete
+                        </button>
                     </div>
-                    <button id="complete-btn" class="shrink-0 px-5 py-3 rounded-2xl bg-[#6B3D2E] text-white font-semibold">
-                        Complete
-                    </button>
-                </div>
 
-                <div id="listening-passage" class="text-[18px] leading-[3.35rem] text-[#3A2A22]">
-                    @foreach($listeningExercise['items'] as $item)
-                        @php
-                            [$before, $after] = array_pad(explode('_____', $item['context'], 2), 2, '');
-                            $blankChars = max(strlen($item['answer'] ?? ''), 8);
-                        @endphp
-                        <span class="sentence-block inline">
-                            <span>{{ trim($before) }}</span>
-                            <span class="blank-cluster">
-                                <input
-                                    data-answer-id="{{ $item['id'] }}"
-                                    data-blank-chars="{{ $blankChars }}"
-                                    style="width: {{ min($blankChars + 1, 18) }}ch;"
-                                    class="inline-input mx-1.5 px-2 py-1 rounded-xl border border-[#D9C7B5] bg-white text-center text-[#3A2A22] focus:outline-none focus:border-[#6B3D2E]"
-                                    placeholder="..."
-                                    autocomplete="off"
-                                >
-                                <span
-                                    data-result-id="{{ $item['id'] }}"
-                                    class="hidden inline-result px-2 py-1 rounded-lg text-sm"
-                                ></span>
+                    <div id="listening-passage" class="text-[18px] leading-[3.35rem] text-[#3A2A22]">
+                        @foreach($listeningExercise['items'] as $item)
+                            @php
+                                [$before, $after] = array_pad(explode('_____', $item['context'], 2), 2, '');
+                                $blankChars = max(strlen($item['answer'] ?? ''), 8);
+                            @endphp
+                            <span class="sentence-block inline">
+                                <span>{{ trim($before) }}</span>
+                                <span class="blank-cluster">
+                                    <input
+                                        data-answer-id="{{ $item['id'] }}"
+                                        data-blank-chars="{{ $blankChars }}"
+                                        style="width: {{ min($blankChars + 1, 18) }}ch;"
+                                        class="inline-input mx-1.5 px-2 py-1 rounded-xl border border-[#D9C7B5] bg-white text-center text-[#3A2A22] focus:outline-none focus:border-[#6B3D2E]"
+                                        placeholder="..."
+                                        autocomplete="off"
+                                        value="{{ $listeningExercise['latest_submission']['answers'][$item['id']] ?? '' }}"
+                                    >
+                                    <span
+                                        data-result-id="{{ $item['id'] }}"
+                                        class="hidden inline-result px-2 py-1 rounded-lg text-sm"
+                                    ></span>
+                                </span>
+                                <span>{{ trim($after) }}</span>
                             </span>
-                            <span>{{ trim($after) }}</span>
-                        </span>
-                    @endforeach
-                </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        No listening exercise has been configured for this article yet.
+                    </div>
+                @endif
             </div>
 
             <div id="summary-panel" class="hidden mt-6 bg-[#4A2C2A] text-white rounded-3xl p-6 shadow-sm">
@@ -153,10 +166,12 @@
 </style>
 @endpush
 
+@if($listeningExercise)
 @push('scripts')
 <script>
 const evaluateUrl = @json(route('articles.listening.evaluate', $article));
 const exerciseId = @json($listeningExercise['id']);
+const latestSubmission = @json($listeningExercise['latest_submission'] ?? null);
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 const completeBtn = document.getElementById('complete-btn');
 const summaryPanel = document.getElementById('summary-panel');
@@ -169,6 +184,10 @@ blankInputs.forEach((input) => {
     syncInputWidth(input);
     input.addEventListener('input', () => syncInputWidth(input));
 });
+
+if (latestSubmission?.result) {
+    renderResults(latestSubmission.result);
+}
 
 completeBtn.addEventListener('click', async () => {
     const answers = { items: {} };
@@ -240,3 +259,4 @@ function syncInputWidth(input) {
 }
 </script>
 @endpush
+@endif
