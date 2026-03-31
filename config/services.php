@@ -37,14 +37,27 @@ return [
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash-exp'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/models'),
+    ],
+
+    'qwen_omni' => [
+        'api_key' => env('QWEN_OMNI_API_KEY'),
+        'model' => env('QWEN_OMNI_MODEL', 'qwen-omni-turbo'),
+        'base_url' => env('QWEN_OMNI_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1'),
     ],
 
     'groq' => [
         'api_key' => env('GROQ_API_KEY'),
         'stt_model' => env('GROQ_STT_MODEL', 'whisper-large-v3-turbo'),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+    ],
+
+    'speaking' => [
+        // gemini: native audio multimodal scoring
+        // qwen_omni: native audio multimodal scoring (OpenAI-compatible endpoint)
+        // ollama: requires STT first
+        'provider' => env('SPEAKING_EVAL_PROVIDER', 'gemini'),
     ],
 
 ];
