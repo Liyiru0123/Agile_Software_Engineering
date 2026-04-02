@@ -26,7 +26,7 @@
                     </div>
                 @endif
 
-                <div class="space-y-4">
+                <div class="space-y-4" data-translate-scope="true" data-article-id="{{ $article->id }}" data-source-language="en" data-target-language="zh-CN">
                     @foreach($speakingPrompts as $prompt)
                         <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-5">
                             <div class="text-xs font-semibold uppercase tracking-[0.15em] text-[#6B3D2E] mb-2">{{ $prompt['title'] }}</div>
@@ -114,3 +114,4 @@ stopSpeaking.addEventListener('click', () => {
 });
 </script>
 @endpush
+

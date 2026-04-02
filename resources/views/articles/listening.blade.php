@@ -64,7 +64,7 @@
                         </button>
                     </div>
 
-                    <div id="listening-passage" class="text-[18px] leading-[3.35rem] text-[#3A2A22]">
+                    <div id="listening-passage" class="text-[18px] leading-[3.35rem] text-[#3A2A22]" data-translate-scope="true" data-article-id="{{ $article->id }}" data-source-language="en" data-target-language="zh-CN">
                         @foreach($listeningExercise['items'] as $item)
                             @php
                                 [$before, $after] = array_pad(explode('_____', $item['context'], 2), 2, '');
@@ -260,3 +260,4 @@ function syncInputWidth(input) {
 </script>
 @endpush
 @endif
+

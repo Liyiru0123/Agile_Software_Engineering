@@ -16,9 +16,9 @@
                     Read the article first, then focus on the academic keywords and the main idea. This page keeps the full text available for close reading, annotation, and comprehension work.
                 </p>
 
-                <div class="space-y-6 text-[#3A2A22] leading-8 text-[17px]">
+                <div class="space-y-6 text-[#3A2A22] leading-8 text-[17px]" data-translate-scope="true" data-article-id="{{ $article->id }}" data-source-language="en" data-target-language="zh-CN">
                     @foreach($paragraphs as $paragraph)
-                        <p>{{ $paragraph }}</p>
+                        <p data-article-id="{{ $article->id }}" data-paragraph-index="{{ $loop->index }}">{{ $paragraph }}</p>
                     @endforeach
                 </div>
             </section>
