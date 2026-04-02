@@ -31,12 +31,45 @@
                         <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-5 cursor-pointer hover:border-[#C9A961] transition-colors exercise-item"
                              data-exercise-id="{{ $exercise->id }}"
                              onclick="selectExercise(this)">
+                            @php
+                                $questionText = $exercise->question_data['question']
+                                    ?? $exercise->question_data['instruction']
+                                    ?? null;
+                                $topicText = $exercise->question_data['topic'] ?? null;
+                            @endphp
                             <div class="text-xs font-semibold uppercase tracking-[0.15em] text-[#6B3D2E] mb-2">
                                 {{ $exercise->question_data['title'] ?? 'Speaking Task' }}
                             </div>
-                            <div class="text-[#3A2A22] leading-7">
-                                {{ $exercise->question_data['instruction'] ?? ($exercise->question_data['topic'] ?? 'No instruction provided.') }}
+
+                            <div class="grid md:grid-cols-2 gap-3">
+                                <div class="rounded-2xl bg-white/70 border border-[#E9DDCF] p-3">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A654E] mb-1">Question</div>
+                                    <div class="text-[#3A2A22] leading-7 text-sm">
+                                        {{ $questionText ?: 'No question provided.' }}
+                                    </div>
+                                </div>
+
+                                <div class="rounded-2xl bg-white/70 border border-[#E9DDCF] p-3">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A654E] mb-1">Topic</div>
+                                    <div class="text-[#3A2A22] leading-7 text-sm">
+                                        {{ $topicText ?: 'No topic provided.' }}
+                                    </div>
+                                </div>
                             </div>
+
+                            @if(isset($exercise->question_data['prep_time']) || isset($exercise->question_data['speak_time']))
+                                <div class="mt-3 text-xs text-[#8A654E]">
+                                    @if(isset($exercise->question_data['prep_time']))
+                                        Prep: {{ (int) $exercise->question_data['prep_time'] }}s
+                                    @endif
+                                    @if(isset($exercise->question_data['prep_time']) && isset($exercise->question_data['speak_time']))
+                                        ·
+                                    @endif
+                                    @if(isset($exercise->question_data['speak_time']))
+                                        Speak: {{ (int) $exercise->question_data['speak_time'] }}s
+                                    @endif
+                                </div>
+                            @endif
                         </div>
                     @empty
                         <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-8 text-center text-[#6B3D2E]">
