@@ -53,6 +53,14 @@ return [
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
     ],
 
+    'langbly' => [
+        'api_key' => env('LANGBLY_API_KEY'),
+        'base_url' => env('LANGBLY_BASE_URL', 'https://api.langbly.com/language/translate/v2'),
+        'default_source' => env('LANGBLY_DEFAULT_SOURCE', 'en'),
+        'default_target' => env('LANGBLY_DEFAULT_TARGET', 'zh-CN'),
+        'quality' => env('LANGBLY_QUALITY', 'standard'),
+    ],
+
     'speaking' => [
         // gemini: native audio multimodal scoring
         // qwen_omni: native audio multimodal scoring (OpenAI-compatible endpoint)

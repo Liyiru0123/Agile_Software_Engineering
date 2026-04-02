@@ -38,8 +38,8 @@ DB_PASSWORD=
 ```bash
 php artisan migrate
 ```
+## 导入数据：
 
-## 6. 导入数据
 
 ```bash
 mysql -u root -p english_learning < database/sql/version3.21/generated_article_exercise_dataset.sql
