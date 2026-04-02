@@ -6,8 +6,14 @@ use App\ListeningExerciseService;
 use App\WritingExerciseService;
 use App\Models\Article;
 use App\Models\Exercise;
+use App\Models\Submission;
 use App\Services\ArticleTextProcessor;
+use App\Services\GeminiAudioService;
+use App\Services\OllamaSpeakingService;
+use App\Services\QwenOmniAudioService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
 class ArticleController extends Controller
@@ -15,7 +21,10 @@ class ArticleController extends Controller
     public function __construct(
         protected ArticleTextProcessor $processor,
         protected ListeningExerciseService $listeningExerciseService,
-        protected WritingExerciseService $writingExerciseService
+        protected WritingExerciseService $writingExerciseService,
+        protected GeminiAudioService $geminiAudioService,
+        protected OllamaSpeakingService $ollamaSpeakingService,
+        protected QwenOmniAudioService $qwenOmniAudioService
     ) {
     }
 
@@ -45,10 +54,92 @@ class ArticleController extends Controller
     public function speaking(Article $article): View
     {
         $data = $this->buildPageData($article);
-        $exercise = $article->exercises()->where('type', 'speaking')->first();
-        $data['speakingPrompts'] = $this->buildSpeakingPrompts($exercise);
+        $exercises = $article->exercises()->where('type', 'speaking')->get();
+        $data['speakingExercises'] = $exercises;
 
         return view('articles.speaking', $data);
+    }
+
+    public function submitSpeaking(Request $request, Article $article)
+    {
+        $request->validate([
+            'exercise_id' => [
+                'required',
+                Rule::exists('exercises', 'id')
+                    ->where('article_id', $article->id)
+                    ->where('type', 'speaking'),
+            ],
+            'audio' => 'required|file|mimes:webm,wav,mp3,m4a,ogg|max:10240',
+            'page_opened_at' => 'sometimes|integer|min:1',
+        ]);
+
+        $exercise = Exercise::findOrFail($request->exercise_id);
+        
+        // 1. Save the recording
+        $path = $request->file('audio')->store('submissions/speaking', 'public');
+
+        // 2. Evaluate speaking by configured provider
+        $instructions = $exercise->question_data['instruction'] ?? 
+                      ($exercise->question_data['topic'] ?? 'No specific instruction.');
+
+        $provider = strtolower((string) config('services.speaking.provider', 'gemini'));
+
+        $evaluation = match ($provider) {
+            'qwen_omni' => $this->qwenOmniAudioService->evaluateAudio(
+                $request->file('audio'),
+                $instructions,
+                Str::limit($article->content, 5000)
+            ),
+            'ollama' => $this->ollamaSpeakingService->evaluateSpeaking(
+                $request->file('audio'),
+                $instructions,
+                Str::limit($article->content, 3000)
+            ),
+            default => $this->geminiAudioService->evaluateAudio(
+                $request->file('audio'),
+                $instructions,
+                Str::limit($article->content, 5000)
+            ),
+        };
+
+        $evaluation['provider'] = $provider;
+
+        if (isset($evaluation['error'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $evaluation['error'],
+                'evaluation' => $evaluation,
+            ], 422);
+        }
+
+        $timeSpent = 0;
+        if ($request->filled('page_opened_at')) {
+            $openedAtMs = (int) $request->input('page_opened_at');
+            $nowMs = now()->valueOf();
+            $timeSpent = max(0, (int) floor(($nowMs - $openedAtMs) / 1000));
+        }
+
+        // 3. Create Submission
+        $submission = Submission::create([
+            'user_id' => auth()->id(),
+            'exercise_id' => $exercise->id,
+            'article_id' => $article->id,
+            'user_answer' => [
+                'audio_path' => $path,
+                'transcript' => $evaluation['transcript'] ?? null
+            ],
+            'score' => $evaluation['score'] ?? 0,
+            'time_spent' => $timeSpent,
+            'ai_advice' => $evaluation,
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your recording has been submitted and evaluated successfully.',
+            'submission_id' => $submission->id,
+            'evaluation' => $evaluation
+        ]);
     }
 
     public function reading(Article $article): View
