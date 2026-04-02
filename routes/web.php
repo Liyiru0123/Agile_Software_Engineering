@@ -4,6 +4,7 @@ use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ListeningTrainingController;
+use App\Http\Controllers\ReadingQuestionAttemptController;
 use App\Http\Controllers\SelectionTranslationController;
 use App\Http\Controllers\WritingTrainingController;
 use App\Models\Article;
@@ -192,6 +193,8 @@ Route::get('/articles/{article}/listening', [ArticleController::class, 'listenin
 Route::get('/articles/{article}/speaking', [ArticleController::class, 'speaking'])->name('articles.speaking')->middleware('auth');
 Route::post('/articles/{article}/speaking/submit', [ArticleController::class, 'submitSpeaking'])->name('articles.speaking.submit')->middleware('auth');
 Route::get('/articles/{article}/reading', [ArticleController::class, 'reading'])->name('articles.reading')->middleware('auth');
+Route::get('/articles/{article}/reading/questions', [ReadingQuestionAttemptController::class, 'index'])->name('articles.reading.questions')->middleware('auth');
+Route::post('/articles/{article}/reading/submit', [ReadingQuestionAttemptController::class, 'submit'])->name('articles.reading.submit')->middleware('auth');
 Route::get('/articles/{article}/writing', [ArticleController::class, 'writing'])->name('articles.writing')->middleware('auth');
 Route::post('/articles/{article}/listening/evaluate', [ListeningTrainingController::class, 'evaluate'])->name('articles.listening.evaluate')->middleware('auth');
 Route::post('/articles/{article}/writing/evaluate', [WritingTrainingController::class, 'evaluate'])->name('articles.writing.evaluate')->middleware('auth');
@@ -246,4 +249,3 @@ Route::get('/register', function () {
 })->name('register')->middleware('guest');
 
 Route::post('/register', [RegisterController::class, 'register'])->name('register.post');
-
