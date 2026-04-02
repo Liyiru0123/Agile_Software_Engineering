@@ -8,6 +8,10 @@ use App\Http\Controllers\Api\ReadingHistoryApiController;
 use App\Http\Controllers\Api\TagApiController;
 use App\Http\Controllers\Api\VocabularyNoteApiController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ReadingQuestionAttemptController;
+
+Route::get('/articles/{article}/quiz/questions', [ReadingQuestionAttemptController::class, 'index']);
+Route::post('/articles/{article}/quiz/submit', [ReadingQuestionAttemptController::class, 'submit']);
 
 Route::prefix('articles')->group(function () {
     Route::get('/', [ArticleApiController::class, 'index']);
