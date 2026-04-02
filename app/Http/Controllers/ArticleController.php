@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\ListeningExerciseService;
-use App\WritingExerciseService;
 use App\Models\Article;
 use App\Models\Exercise;
 use App\Models\Submission;
@@ -11,16 +10,21 @@ use App\Services\ArticleTextProcessor;
 use App\Services\GeminiAudioService;
 use App\Services\OllamaSpeakingService;
 use App\Services\QwenOmniAudioService;
+use App\Services\ReadingExerciseService;
+use App\Services\SpeakingExerciseService;
+use App\WritingExerciseService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ArticleController extends Controller
 {
     public function __construct(
         protected ArticleTextProcessor $processor,
         protected ListeningExerciseService $listeningExerciseService,
+        protected ReadingExerciseService $readingExerciseService,
+        protected SpeakingExerciseService $speakingExerciseService,
         protected WritingExerciseService $writingExerciseService,
         protected GeminiAudioService $geminiAudioService,
         protected OllamaSpeakingService $ollamaSpeakingService,
@@ -56,6 +60,9 @@ class ArticleController extends Controller
         $data = $this->buildPageData($article);
         $exercises = $article->exercises()->where('type', 'speaking')->get();
         $data['speakingExercises'] = $exercises;
+        $data['shadowingClips'] = filled($data['audioUrl'])
+            ? $this->speakingExerciseService->buildShadowingClips($article)
+            : [];
 
         return view('articles.speaking', $data);
     }
@@ -74,35 +81,70 @@ class ArticleController extends Controller
         ]);
 
         $exercise = Exercise::findOrFail($request->exercise_id);
-        
-        // 1. Save the recording
+
+        // Save the uploaded recording for later review.
         $path = $request->file('audio')->store('submissions/speaking', 'public');
 
-        // 2. Evaluate speaking by configured provider
-        $instructions = $exercise->question_data['instruction'] ?? 
-                      ($exercise->question_data['topic'] ?? 'No specific instruction.');
+        $instructions = $exercise->question_data['instruction']
+            ?? ($exercise->question_data['topic'] ?? 'No specific instruction.');
+        $practiceMode = (string) $request->input('practice_mode', 'open_response');
+        $shadowingClip = null;
+
+        if ($practiceMode === 'shadowing' && $request->filled('shadowing_clip_id')) {
+            $shadowingClip = $this->speakingExerciseService->findShadowingClip(
+                $article,
+                (string) $request->input('shadowing_clip_id')
+            );
+
+            if (! $shadowingClip) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected shadowing clip could not be found.',
+                ], 422);
+            }
+        }
+
+        $taskContext = $shadowingClip
+            ? [
+                'mode' => 'shadowing',
+                'instruction' => 'Repeat the target excerpt as accurately and naturally as possible.',
+                'target_text' => $shadowingClip['transcript'],
+                'title' => $shadowingClip['title'],
+            ]
+            : [
+                'mode' => 'open_response',
+                'instruction' => $instructions,
+                'title' => (string) ($exercise->question_data['title'] ?? 'Speaking Task'),
+            ];
 
         $provider = strtolower((string) config('services.speaking.provider', 'gemini'));
 
         $evaluation = match ($provider) {
             'qwen_omni' => $this->qwenOmniAudioService->evaluateAudio(
                 $request->file('audio'),
-                $instructions,
+                $taskContext['instruction'],
                 Str::limit($article->content, 5000)
             ),
             'ollama' => $this->ollamaSpeakingService->evaluateSpeaking(
                 $request->file('audio'),
-                $instructions,
+                $taskContext['instruction'],
                 Str::limit($article->content, 3000)
             ),
             default => $this->geminiAudioService->evaluateAudio(
                 $request->file('audio'),
-                $instructions,
+                $taskContext,
                 Str::limit($article->content, 5000)
             ),
         };
 
         $evaluation['provider'] = $provider;
+        $evaluation['practice_mode'] = $taskContext['mode'];
+        $evaluation['task_title'] = $taskContext['title'];
+
+        if ($shadowingClip) {
+            $evaluation['target_text'] = $shadowingClip['transcript'];
+            $evaluation['clip_id'] = $shadowingClip['id'];
+        }
 
         if (isset($evaluation['error'])) {
             return response()->json([
@@ -119,14 +161,16 @@ class ArticleController extends Controller
             $timeSpent = max(0, (int) floor(($nowMs - $openedAtMs) / 1000));
         }
 
-        // 3. Create Submission
         $submission = Submission::create([
             'user_id' => auth()->id(),
             'exercise_id' => $exercise->id,
             'article_id' => $article->id,
             'user_answer' => [
                 'audio_path' => $path,
-                'transcript' => $evaluation['transcript'] ?? null
+                'transcript' => $evaluation['transcript'] ?? null,
+                'practice_mode' => $taskContext['mode'],
+                'shadowing_clip_id' => $shadowingClip['id'] ?? null,
+                'target_text' => $shadowingClip['transcript'] ?? null,
             ],
             'score' => $evaluation['score'] ?? 0,
             'time_spent' => $timeSpent,
@@ -138,7 +182,7 @@ class ArticleController extends Controller
             'success' => true,
             'message' => 'Your recording has been submitted and evaluated successfully.',
             'submission_id' => $submission->id,
-            'evaluation' => $evaluation
+            'evaluation' => $evaluation,
         ]);
     }
 
@@ -146,7 +190,8 @@ class ArticleController extends Controller
     {
         $data = $this->buildPageData($article);
         $data['readingExercise'] = $article->exercises()->where('type', 'reading')->first();
-        $data['readingQuestions'] = $this->buildReadingQuestions();
+        $data['readingQuestions'] = $this->readingExerciseService->getPublicQuestions($article);
+        $data['articleSentenceMap'] = $this->buildArticleSentenceMap($data['paragraphs']);
         $data['keywords'] = $this->extractKeywords($article->content);
 
         return view('articles.reading', $data);
@@ -187,28 +232,28 @@ class ArticleController extends Controller
         return [
             [
                 'title' => 'Listening',
-                'description' => 'AI 生成语义重点填空、逻辑词训练和主旨题，并给出错因反馈。',
+                'description' => 'Practice listening with article-based fill-in-the-blank tasks, discourse markers, and focused comprehension feedback.',
                 'status' => $article->audio_url ? 'Audio ready' : 'Text preview only',
                 'route' => route('articles.listening', $article),
                 'cta' => 'Start listening',
             ],
             [
                 'title' => 'Speaking',
-                'description' => '围绕文章做复述、观点表达和 shadowing 练习，支持浏览器录音。',
+                'description' => 'Retell the article, express your opinion, and do shadowing practice with in-browser recording support.',
                 'status' => 'Practice prompts ready',
                 'route' => route('articles.speaking', $article),
                 'cta' => 'Start speaking',
             ],
             [
                 'title' => 'Reading',
-                'description' => '阅读原文、抓关键词并完成理解问题，适合精读和学术词汇积累。',
+                'description' => 'Read the full text, identify key vocabulary, and answer comprehension questions for close reading practice.',
                 'status' => 'Reading tasks ready',
                 'route' => route('articles.reading', $article),
                 'cta' => 'Start reading',
             ],
             [
                 'title' => 'Writing',
-                'description' => '根据文章完成 summary 和 response 写作，控制字数并检查结构。',
+                'description' => 'Complete summary and response writing tasks based on the article with word-count and structure guidance.',
                 'status' => 'Writing prompt ready',
                 'route' => route('articles.writing', $article),
                 'cta' => 'Start writing',
@@ -230,24 +275,15 @@ class ArticleController extends Controller
 
         $prompts[] = [
             'title' => '45-Second Summary',
-            'instruction' => '用 45 秒概括文章的核心论点、支持细节和结论。',
+            'instruction' => 'Summarize the article\'s main claim, supporting details, and conclusion in 45 seconds.',
         ];
 
         $prompts[] = [
             'title' => 'Critical Response',
-            'instruction' => '挑一个你最认同或最质疑的观点，说明原因并给出一个现实例子。',
+            'instruction' => 'Choose one idea you agree with most or question most, explain why, and give one real-world example.',
         ];
 
         return collect($prompts)->unique('title')->values()->all();
-    }
-
-    protected function buildReadingQuestions(): array
-    {
-        return [
-            'What is the central claim of the article? Summarize it in one sentence.',
-            'Which supporting detail is the most important, and why?',
-            'Which connector or academic term best signals the author’s logic?',
-        ];
     }
 
     protected function buildWritingTask(Article $article, ?Exercise $exercise): array
@@ -256,7 +292,7 @@ class ArticleController extends Controller
 
         return [
             'instruction' => $questionData['instruction'] ?? 'Write a short academic response based on the article.',
-            'requirement' => $questionData['requirement'] ?? '先用 80-120 词概括文章，再用 60-100 词表达你的评价或应用场景。',
+            'requirement' => $questionData['requirement'] ?? 'First write an 80-120 word summary of the article, then add a 60-100 word evaluation or application.',
             'source_text' => $questionData['source_text'] ?? Str::limit($article->content, 220),
             'word_limit' => $questionData['word_limit'] ?? ['min' => 140, 'max' => 220],
         ];
@@ -279,6 +315,26 @@ class ArticleController extends Controller
             ->sortDesc()
             ->keys()
             ->take(8)
+            ->values()
+            ->all();
+    }
+
+    protected function buildArticleSentenceMap(array $paragraphs): array
+    {
+        return collect($paragraphs)
+            ->map(function (string $paragraph, int $paragraphIndex) {
+                return [
+                    'paragraph_index' => $paragraphIndex,
+                    'sentences' => collect($this->processor->splitSentences($paragraph))
+                        ->map(fn (string $sentence, int $sentenceIndex) => [
+                            'anchor' => 'p'.$paragraphIndex.'-s'.$sentenceIndex,
+                            'label' => 'Paragraph '.($paragraphIndex + 1).', sentence '.($sentenceIndex + 1),
+                            'text' => $sentence,
+                        ])
+                        ->values()
+                        ->all(),
+                ];
+            })
             ->values()
             ->all();
     }

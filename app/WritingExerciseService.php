@@ -7,6 +7,7 @@ use App\Models\Article;
 use App\Models\Exercise;
 use App\Models\Submission;
 use App\Services\ArticleTextProcessor;
+use App\Services\WritingTaskMetadataBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -44,7 +45,8 @@ class WritingExerciseService
     ];
 
     public function __construct(
-        protected ArticleTextProcessor $processor
+        protected ArticleTextProcessor $processor,
+        protected WritingTaskMetadataBuilder $writingTaskBuilder
     ) {
     }
 
@@ -177,22 +179,18 @@ class WritingExerciseService
             ->values()
             ->all();
 
-        $missingTypes = array_values(array_diff(self::CORE_TASK_TYPES, $existingTypes));
+        $missingTasks = $this->writingTaskBuilder->buildMissingTasks($article->content, $existingTypes);
 
-        if ($missingTypes !== []) {
+        if ($missingTasks !== []) {
             $aiPromptId = AiPrompt::query()
                 ->where('type', 'writing')
                 ->value('id');
 
-            $blueprints = $this->defaultTaskBlueprints($article);
-
-            foreach ($missingTypes as $taskType) {
-                $task = $blueprints[$taskType];
-
+            foreach ($missingTasks as $task) {
                 Exercise::query()->create([
                     'article_id' => $article->id,
                     'type' => 'writing',
-                    'question_data' => $task + ['provider' => 'generated-fallback'],
+                    'question_data' => $task,
                     'answer' => null,
                     'ai_prompt_id' => $aiPromptId,
                 ]);
@@ -209,7 +207,13 @@ class WritingExerciseService
 
     protected function presentExercise(Article $article, Exercise $exercise, ?Submission $latestSubmission = null): array
     {
-        $questionData = $exercise->question_data ?? [];
+        $questionData = is_array($exercise->question_data)
+            ? $this->writingTaskBuilder->enrichTaskData(
+                $article->content,
+                $exercise->question_data,
+                (string) (($exercise->question_data['provider'] ?? 'database'))
+            )
+            : [];
         $taskType = $this->detectTaskType($questionData);
         $defaults = $this->defaultTaskBlueprints($article)[$taskType];
         $wordLimit = $this->normalizeWordLimit($questionData['word_limit'] ?? $defaults['word_limit']);
@@ -233,100 +237,14 @@ class WritingExerciseService
 
     protected function defaultTaskBlueprints(Article $article): array
     {
-        $paragraphs = $this->processor->splitParagraphs($article->content);
-        $sentences = collect($paragraphs)
-            ->flatMap(fn (string $paragraph) => $this->processor->splitSentences($paragraph))
-            ->filter()
-            ->values();
-
-        $summaryExcerpt = Str::limit($sentences->take(3)->implode(' '), 320);
-        $paraphraseExcerpt = Str::limit($sentences->first() ?: $article->content, 220);
-
-        return [
-            'summary_response' => [
-                'task_type' => 'summary_response',
-                'title' => 'Summary + Response',
-                'badge' => 'Integrated writing',
-                'instruction' => 'Summarize the article clearly, then explain your own judgment or application of the main idea.',
-                'requirement' => 'Write one concise summary paragraph and one short response paragraph. Mention the main claim, one supporting detail, and your own evaluation.',
-                'source_text' => $summaryExcerpt,
-                'word_limit' => ['min' => 130, 'max' => 190],
-                'checkpoints' => [
-                    'Open with the article topic and central claim.',
-                    'Include at least one concrete supporting detail from the source.',
-                    'Finish with your own response, evaluation, or real-world application.',
-                ],
-                'rubric_focus' => [
-                    'Task achievement',
-                    'Clear organization',
-                    'Relevant support',
-                    'Accurate academic language',
-                ],
-            ],
-            'paraphrase' => [
-                'task_type' => 'paraphrase',
-                'title' => 'Paraphrase Studio',
-                'badge' => 'Low-similarity rewrite',
-                'instruction' => 'Rewrite the source excerpt in your own words while keeping the meaning accurate and reducing similarity.',
-                'requirement' => 'Change sentence structure, vocabulary, and transitions. Do not copy long chunks from the source text.',
-                'source_text' => $paraphraseExcerpt,
-                'word_limit' => ['min' => 45, 'max' => 110],
-                'checkpoints' => [
-                    'Keep the original meaning accurate.',
-                    'Avoid copying long phrases directly from the source.',
-                    'Use at least one new connector or sentence pattern.',
-                ],
-                'rubric_focus' => [
-                    'Meaning accuracy',
-                    'Paraphrase depth',
-                    'Vocabulary variation',
-                    'Sentence control',
-                ],
-            ],
-            'opinion' => [
-                'task_type' => 'opinion',
-                'title' => 'Opinion Builder',
-                'badge' => 'Argument writing',
-                'instruction' => 'Take a position on the article topic and support it with reasons or examples.',
-                'requirement' => 'State your view clearly, connect it to the article, and develop at least one supporting reason or example.',
-                'source_text' => $summaryExcerpt,
-                'word_limit' => ['min' => 120, 'max' => 180],
-                'checkpoints' => [
-                    'State a clear opinion early in the response.',
-                    'Refer to the article topic or one of its key ideas.',
-                    'Support your position with explanation, evidence, or an example.',
-                ],
-                'rubric_focus' => [
-                    'Clear stance',
-                    'Logical support',
-                    'Coherent flow',
-                    'Academic tone',
-                ],
-            ],
-        ];
+        return collect($this->writingTaskBuilder->buildMissingTasks($article->content, []))
+            ->keyBy('task_type')
+            ->all();
     }
 
     protected function detectTaskType(array $questionData): string
     {
-        $rawTaskType = (string) ($questionData['task_type'] ?? '');
-
-        if (in_array($rawTaskType, self::CORE_TASK_TYPES, true)) {
-            return $rawTaskType;
-        }
-
-        $text = Str::lower(trim(($questionData['instruction'] ?? '').' '.($questionData['requirement'] ?? '')));
-
-        if ($text !== '') {
-            if (Str::contains($text, ['rewrite', 'paraphrase', 'similarity', 'reduce similarity'])) {
-                return 'paraphrase';
-            }
-
-            if (Str::contains($text, ['opinion', 'agree', 'disagree', 'your view', 'your own'])) {
-                return 'opinion';
-            }
-        }
-
-        return 'summary_response';
+        return $this->writingTaskBuilder->detectTaskType($questionData);
     }
 
     protected function normalizeWordLimit(mixed $wordLimit): array
@@ -340,6 +258,7 @@ class WritingExerciseService
     protected function evaluateLocally(Article $article, array $task, string $draft, int $wordCount): array
     {
         $wordLimit = $task['word_limit'];
+        $profile = $this->taskScoringProfile($task);
         $sentences = $this->splitSentences($draft);
         $paragraphs = preg_split("/\r\n\r\n|\n\n/", trim($draft)) ?: [];
         $paragraphCount = max(1, count(array_filter(array_map('trim', $paragraphs))));
@@ -350,27 +269,38 @@ class WritingExerciseService
         $opinionSignal = $this->containsAny($draft, self::OPINION_MARKERS) ? 1.0 : 0.45;
         $sentenceCount = max(1, count($sentences));
         $wordRangeScore = $this->wordRangeScore($wordCount, $wordLimit['min'], $wordLimit['max']);
+        $sentenceStructureScore = $this->scoreFromBands($sentenceCount, $profile['sentence_bands']);
+        $paragraphStructureScore = $this->scoreFromBands($paragraphCount, $profile['paragraph_bands']);
+        $supportSignal = ($sentenceStructureScore + $paragraphStructureScore + $this->scoreFromBands($connectorCount, [
+            0 => 0.32,
+            1 => 0.7,
+            2 => 0.9,
+            10 => 1.0,
+        ])) / 3;
 
         $taskSignal = match ($task['task_type']) {
-            'paraphrase' => $this->scoreFromBands($similarity, [
-                0.23 => 1.0,
-                0.35 => 0.82,
-                0.48 => 0.62,
-                1.00 => 0.35,
-            ]),
-            'opinion' => ($opinionSignal + min(1, $sentenceCount / 4) + $keywordCoverage) / 3,
-            default => ($keywordCoverage + $opinionSignal + min(1, $sentenceCount / 4)) / 3,
+            'paraphrase' => (
+                $this->scoreFromBands($similarity, [
+                    0.23 => 1.0,
+                    0.35 => 0.82,
+                    0.48 => 0.62,
+                    1.00 => 0.35,
+                ]) * 0.7
+            ) + ($supportSignal * 0.3),
+            'opinion' => ($opinionSignal * 0.45) + ($supportSignal * 0.35) + ($keywordCoverage * 0.2),
+            default => ($keywordCoverage * 0.45) + ($opinionSignal * 0.2) + ($supportSignal * 0.35),
         };
 
-        $taskAchievement = round((($wordRangeScore * 0.25) + ($keywordCoverage * 0.4) + ($taskSignal * 0.35)) * 25, 1);
+        $taskAchievement = round(((
+            $wordRangeScore * $profile['task_weights']['word_range']
+        ) + (
+            $keywordCoverage * $profile['task_weights']['keyword_coverage']
+        ) + (
+            $taskSignal * $profile['task_weights']['task_signal']
+        )) * 25, 1);
 
         $coherence = round(((
-            $this->scoreFromBands($sentenceCount, [
-                2 => 0.35,
-                4 => 0.82,
-                7 => 1.0,
-                20 => 0.7,
-            ]) * 0.35
+            $sentenceStructureScore * 0.35
         ) + (
             $this->scoreFromBands($connectorCount, [
                 0 => 0.32,
@@ -379,12 +309,7 @@ class WritingExerciseService
                 10 => 1.0,
             ]) * 0.35
         ) + (
-            $this->scoreFromBands($paragraphCount, [
-                1 => 0.7,
-                2 => 1.0,
-                3 => 0.92,
-                10 => 0.68,
-            ]) * 0.3
+            $paragraphStructureScore * 0.3
         )) * 25, 1);
 
         $longWordRatio = $this->longWordRatio($draft);
@@ -417,12 +342,7 @@ class WritingExerciseService
                 35 => 0.72,
             ]) * 0.25
         ) + (
-            $this->scoreFromBands($wordCount, [
-                20 => 0.25,
-                60 => 0.72,
-                120 => 1.0,
-                260 => 0.88,
-            ]) * 0.15
+            $wordRangeScore * 0.15
         )) * 25, 1);
 
         $score = round($taskAchievement + $coherence + $lexical + $grammar, 2);
@@ -432,7 +352,7 @@ class WritingExerciseService
                 'label' => 'Task Achievement',
                 'score' => $taskAchievement,
                 'max' => 25,
-                'feedback' => $this->taskAchievementFeedback($task, $keywordCoverage, $similarity, $wordRangeScore),
+                'feedback' => $this->taskAchievementFeedback($task, $keywordCoverage, $similarity, $wordRangeScore, $paragraphCount),
             ],
             [
                 'key' => 'coherence',
@@ -467,7 +387,7 @@ class WritingExerciseService
         $improvements = [];
 
         if ($taskAchievement >= 18) {
-            $strengths[] = 'The draft addresses the task directly and stays close to the article topic.';
+            $strengths[] = $this->taskAchievementStrength($task['task_type']);
         }
 
         if ($coherence >= 18) {
@@ -492,6 +412,14 @@ class WritingExerciseService
 
         if ($task['task_type'] !== 'paraphrase' && $keywordCoverage < 0.45) {
             $improvements[] = 'Refer more directly to the article\'s key ideas so the response feels grounded in the source.';
+        }
+
+        if ($task['task_type'] === 'summary_response' && $paragraphCount < 2) {
+            $improvements[] = 'Split the response into a summary paragraph and a response paragraph so the two parts are easier to follow.';
+        }
+
+        if ($task['task_type'] === 'opinion' && $opinionSignal < 0.8) {
+            $improvements[] = 'State your position more explicitly so the reader can identify your stance immediately.';
         }
 
         if ($connectorCount === 0) {
@@ -929,6 +857,68 @@ PROMPT;
         };
     }
 
+    protected function taskScoringProfile(array $task): array
+    {
+        return match ($task['task_type']) {
+            'paraphrase' => [
+                'sentence_bands' => [
+                    1 => 0.4,
+                    3 => 0.88,
+                    5 => 1.0,
+                    10 => 0.82,
+                ],
+                'paragraph_bands' => [
+                    1 => 1.0,
+                    2 => 0.86,
+                    4 => 0.72,
+                ],
+                'task_weights' => [
+                    'word_range' => 0.25,
+                    'keyword_coverage' => 0.25,
+                    'task_signal' => 0.5,
+                ],
+            ],
+            'opinion' => [
+                'sentence_bands' => [
+                    2 => 0.45,
+                    4 => 0.82,
+                    6 => 1.0,
+                    14 => 0.84,
+                ],
+                'paragraph_bands' => [
+                    1 => 0.82,
+                    2 => 1.0,
+                    3 => 0.92,
+                    6 => 0.72,
+                ],
+                'task_weights' => [
+                    'word_range' => 0.22,
+                    'keyword_coverage' => 0.23,
+                    'task_signal' => 0.55,
+                ],
+            ],
+            default => [
+                'sentence_bands' => [
+                    3 => 0.4,
+                    5 => 0.82,
+                    8 => 1.0,
+                    18 => 0.78,
+                ],
+                'paragraph_bands' => [
+                    1 => 0.42,
+                    2 => 1.0,
+                    3 => 0.92,
+                    6 => 0.74,
+                ],
+                'task_weights' => [
+                    'word_range' => 0.22,
+                    'keyword_coverage' => 0.38,
+                    'task_signal' => 0.4,
+                ],
+            ],
+        };
+    }
+
     protected function usesCompatibleGeminiApi(): bool
     {
         return ! str_contains((string) config('services.gemini.base_url'), 'generativelanguage.googleapis.com');
@@ -1160,7 +1150,7 @@ PROMPT;
         return (float) end($bands);
     }
 
-    protected function taskAchievementFeedback(array $task, float $keywordCoverage, float $similarity, float $wordRangeScore): string
+    protected function taskAchievementFeedback(array $task, float $keywordCoverage, float $similarity, float $wordRangeScore, int $paragraphCount): string
     {
         if ($task['task_type'] === 'paraphrase') {
             return $similarity <= 0.3
@@ -1168,11 +1158,36 @@ PROMPT;
                 : 'The draft still borrows noticeable wording from the source. Push the paraphrase further.';
         }
 
+        if ($task['task_type'] === 'summary_response') {
+            if ($paragraphCount < 2) {
+                return 'The draft shows relevant ideas, but the summary and personal response should be separated more clearly.';
+            }
+
+            return $keywordCoverage >= 0.5 && $wordRangeScore >= 0.9
+                ? 'The response covers the source clearly and includes a distinct personal reaction.'
+                : 'Develop the source summary and the personal response more evenly so both task parts are visible.';
+        }
+
+        if ($task['task_type'] === 'opinion') {
+            return $keywordCoverage >= 0.45 && $wordRangeScore >= 0.9
+                ? 'The response presents a clear position and keeps it connected to the source topic.'
+                : 'Make the stance clearer and support it more directly with article-linked reasoning.';
+        }
+
         if ($keywordCoverage >= 0.5 && $wordRangeScore >= 0.9) {
             return 'The response stays relevant to the source and covers the task in an appropriate length.';
         }
 
         return 'Develop the article-based support more fully and align the draft more tightly with the task instructions.';
+    }
+
+    protected function taskAchievementStrength(string $taskType): string
+    {
+        return match ($taskType) {
+            'paraphrase' => 'The draft responds directly to the paraphrase goal and keeps the source idea in view.',
+            'opinion' => 'The response takes a recognizable position and keeps the discussion on the article topic.',
+            default => 'The draft covers both the source content and the personal response in a task-relevant way.',
+        };
     }
 
     protected function buildRevisionAdvice(array $task, array $wordLimit, float $similarity): string

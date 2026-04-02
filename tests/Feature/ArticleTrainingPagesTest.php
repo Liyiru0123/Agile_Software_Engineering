@@ -170,4 +170,36 @@ class ArticleTrainingPagesTest extends TestCase
             ->assertSee('value="evaluate"', false)
             ->assertSee('"score":100', false);
     }
+
+    public function test_speaking_page_shows_short_shadowing_clips_and_open_response_tasks(): void
+    {
+        $user = User::factory()->create();
+        $article = Article::query()->create([
+            'title' => 'Autonomous Transit Systems',
+            'content' => 'Autonomous transit systems could reduce congestion in large cities. They may also help elderly passengers and people with disabilities travel more independently. However, public trust depends on safety, reliability, and clear accountability when problems occur.',
+            'audio_url' => 'https://example.com/demo.mp3',
+            'difficulty' => 2,
+            'word_count' => 33,
+        ]);
+
+        Exercise::query()->create([
+            'article_id' => $article->id,
+            'type' => 'speaking',
+            'question_data' => [
+                'title' => 'Opinion Prompt',
+                'instruction' => 'Record your response to the following topic',
+                'topic' => 'Would you trust autonomous public transport in your city? Explain why or why not.',
+                'prep_time' => 45,
+                'speak_time' => 90,
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('articles.speaking', $article));
+
+        $response->assertOk()
+            ->assertSee('Short Shadowing Clips')
+            ->assertSee('Open Response Tasks')
+            ->assertSee('Autonomous transit systems could reduce congestion in large cities.')
+            ->assertSee('Would you trust autonomous public transport in your city?');
+    }
 }

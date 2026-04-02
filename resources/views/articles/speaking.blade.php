@@ -2,111 +2,129 @@
 
 @section('title', $article->title.' - Speaking Training')
 
+@php
+    $firstExercise = $speakingExercises->first();
+    $firstShadowingClip = $shadowingClips[0] ?? null;
+@endphp
+
 @section('content')
 <div class="min-h-screen bg-[#F6F0E8] py-10">
     <div class="max-w-6xl mx-auto px-6">
-        <a href="{{ route('articles.show', $article) }}" class="inline-flex items-center text-sm text-[#6B3D2E] hover:text-[#4A2C2A] mb-6">
-            Back to Article
-        </a>
+        <a href="{{ route('articles.show', $article) }}" class="inline-flex items-center text-sm text-[#6B3D2E] hover:text-[#4A2C2A] mb-6">Back to Article</a>
 
         <div class="grid lg:grid-cols-[minmax(0,1.1fr)_360px] gap-8 items-start">
-            <section class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
-                <h1 class="text-3xl font-bold text-[#4A2C2A] mb-3">{{ $article->title }}</h1>
-                <p class="text-[#6B3D2E] leading-7 mb-6">
-                    This page focuses on retelling and opinion-based speaking practice. You can replay the original audio, record your response, and compare it for completeness and natural delivery.
-                </p>
+            <section class="space-y-6">
+                <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
+                    <div class="flex flex-wrap items-center gap-3 mb-4">
+                        <span class="px-3 py-1 rounded-full bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs font-semibold">{{ $difficultyLabel }}</span>
+                        <span class="px-3 py-1 rounded-full bg-[#C9A961]/15 text-[#6B3D2E] text-xs font-semibold">{{ number_format($article->word_count) }} words</span>
+                        <span class="px-3 py-1 rounded-full bg-[#4A2C2A]/10 text-[#4A2C2A] text-xs font-semibold">{{ count($shadowingClips) }} short clips</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-[#4A2C2A] mb-3">{{ $article->title }}</h1>
+                    <p class="text-[#6B3D2E] leading-7">Speaking now supports short shadowing clips and longer open-response prompts. The short clips are replayed from the full article audio as focused segments so learners do not need to scrub through one long file every time.</p>
+                </div>
 
                 @if($audioUrl)
-                    <div class="rounded-2xl border border-[#E8D9C9] bg-[#FAF4EC] p-4 mb-8">
-                        <div class="text-sm font-semibold text-[#6B3D2E] mb-2">Replay the source audio before speaking</div>
-                        <audio controls class="w-full">
+                    <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
+                        <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Source Audio</h2>
+                        <p class="text-[#6B3D2E] leading-6 mb-4">Use the full player for overview listening. Use the short clip cards below for focused follow-and-repeat practice.</p>
+                        <audio id="full-article-audio" controls preload="metadata" class="w-full">
                             <source src="{{ $audioUrl }}">
-                            Your browser does not support the audio element.
+                        </audio>
+                        <audio id="shadowing-audio-player" preload="metadata" class="hidden">
+                            <source src="{{ $audioUrl }}">
                         </audio>
                     </div>
                 @endif
 
-                <div class="space-y-4">
-                    @forelse($speakingExercises as $exercise)
-                        <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-5 cursor-pointer hover:border-[#C9A961] transition-colors exercise-item"
-                             data-exercise-id="{{ $exercise->id }}"
-                             onclick="selectExercise(this)">
+                <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
+                    <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Short Shadowing Clips</h2>
+                    <p class="text-[#6B3D2E] leading-6 mb-6">Repeat one short clip at a time. Scoring focuses on accuracy, fluency, and pronunciation.</p>
+
+                    <div class="space-y-4">
+                        @forelse($shadowingClips as $clip)
+                            <div class="shadowing-clip-item rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-5 cursor-pointer hover:border-[#C9A961] transition-colors" data-clip-id="{{ $clip['id'] }}">
+                                <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                                    <div>
+                                        <div class="text-xs font-semibold uppercase tracking-[0.15em] text-[#6B3D2E] mb-2">{{ $clip['title'] }}</div>
+                                        <div class="text-sm text-[#8A654E]">{{ $clip['word_count'] }} words | about {{ $clip['duration_hint_seconds'] }}s</div>
+                                    </div>
+                                    <button type="button" class="play-shadowing-clip px-4 py-2 rounded-2xl bg-[#4A2C2A] text-white text-sm font-semibold" data-clip-id="{{ $clip['id'] }}">Play Clip</button>
+                                </div>
+                                <div class="rounded-2xl bg-white/80 border border-[#E9DDCF] p-4">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A654E] mb-2">Target Transcript</div>
+                                    <div class="text-[#3A2A22] leading-7 text-sm">{{ $clip['transcript'] }}</div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-8 text-center text-[#6B3D2E]">No short shadowing clips are available for this article yet.</div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
+                    <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Open Response Tasks</h2>
+                    <p class="text-[#6B3D2E] leading-6 mb-6">These prompts keep the longer opinion and retelling practice. Scoring focuses on relevance, fluency, and pronunciation.</p>
+
+                    <div class="space-y-4">
+                        @forelse($speakingExercises as $exercise)
                             @php
-                                $questionText = $exercise->question_data['question']
-                                    ?? $exercise->question_data['instruction']
-                                    ?? null;
+                                $questionText = $exercise->question_data['question'] ?? $exercise->question_data['instruction'] ?? null;
                                 $topicText = $exercise->question_data['topic'] ?? null;
                             @endphp
-                            <div class="text-xs font-semibold uppercase tracking-[0.15em] text-[#6B3D2E] mb-2">
-                                {{ $exercise->question_data['title'] ?? 'Speaking Task' }}
-                            </div>
-
-                            <div class="grid md:grid-cols-2 gap-3">
-                                <div class="rounded-2xl bg-white/70 border border-[#E9DDCF] p-3">
-                                    <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A654E] mb-1">Question</div>
-                                    <div class="text-[#3A2A22] leading-7 text-sm">
-                                        {{ $questionText ?: 'No question provided.' }}
+                            <div class="exercise-item rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-5 cursor-pointer hover:border-[#C9A961] transition-colors" data-exercise-id="{{ $exercise->id }}">
+                                <div class="text-xs font-semibold uppercase tracking-[0.15em] text-[#6B3D2E] mb-2">{{ $exercise->question_data['title'] ?? 'Speaking Task' }}</div>
+                                <div class="grid md:grid-cols-2 gap-3">
+                                    <div class="rounded-2xl bg-white/70 border border-[#E9DDCF] p-3">
+                                        <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A654E] mb-1">Question</div>
+                                        <div class="text-[#3A2A22] leading-7 text-sm">{{ $questionText ?: 'No question provided.' }}</div>
+                                    </div>
+                                    <div class="rounded-2xl bg-white/70 border border-[#E9DDCF] p-3">
+                                        <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A654E] mb-1">Topic</div>
+                                        <div class="text-[#3A2A22] leading-7 text-sm">{{ $topicText ?: 'No topic provided.' }}</div>
                                     </div>
                                 </div>
-
-                                <div class="rounded-2xl bg-white/70 border border-[#E9DDCF] p-3">
-                                    <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A654E] mb-1">Topic</div>
-                                    <div class="text-[#3A2A22] leading-7 text-sm">
-                                        {{ $topicText ?: 'No topic provided.' }}
+                                @if(isset($exercise->question_data['prep_time']) || isset($exercise->question_data['speak_time']))
+                                    <div class="mt-3 text-xs text-[#8A654E]">
+                                        @if(isset($exercise->question_data['prep_time']))
+                                            <span>Prep: {{ (int) $exercise->question_data['prep_time'] }}s</span>
+                                        @endif
+                                        @if(isset($exercise->question_data['prep_time']) && isset($exercise->question_data['speak_time']))
+                                            <span> | </span>
+                                        @endif
+                                        @if(isset($exercise->question_data['speak_time']))
+                                            <span>Speak: {{ (int) $exercise->question_data['speak_time'] }}s</span>
+                                        @endif
                                     </div>
-                                </div>
+                                @endif
                             </div>
-
-                            @if(isset($exercise->question_data['prep_time']) || isset($exercise->question_data['speak_time']))
-                                <div class="mt-3 text-xs text-[#8A654E]">
-                                    @if(isset($exercise->question_data['prep_time']))
-                                        Prep: {{ (int) $exercise->question_data['prep_time'] }}s
-                                    @endif
-                                    @if(isset($exercise->question_data['prep_time']) && isset($exercise->question_data['speak_time']))
-                                        ·
-                                    @endif
-                                    @if(isset($exercise->question_data['speak_time']))
-                                        Speak: {{ (int) $exercise->question_data['speak_time'] }}s
-                                    @endif
-                                </div>
-                            @endif
-                        </div>
-                    @empty
-                        <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-8 text-center text-[#6B3D2E]">
-                            Currently there are no speaking exercises for this article.
-                        </div>
-                    @endforelse
+                        @empty
+                            <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-8 text-center text-[#6B3D2E]">Currently there are no speaking exercises for this article.</div>
+                        @endforelse
+                    </div>
                 </div>
             </section>
 
-            <aside class="space-y-6 sticky top-24">
+            <aside class="space-y-6 sticky top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2 training-sidebar-scroll">
                 <div id="recorder-box" class="bg-[#4A2C2A] text-white rounded-3xl p-6 shadow-lg {{ $speakingExercises->isEmpty() ? 'opacity-50 pointer-events-none' : '' }}">
-                    <h2 class="text-2xl font-bold mb-3">Browser Recorder</h2>
-                    <p class="text-sm text-[#F5E6D3]/80 leading-6 mb-5">
-                        Select a task above, then record your response. Your recording will be submitted for review.
-                    </p>
-                    <div class="mb-4 hidden" id="selected-task-indicator">
-                        <span class="text-xs font-semibold uppercase text-[#C9A961]">Selected:</span>
-                        <div id="selected-task-title" class="text-sm font-medium"></div>
+                    <div class="flex flex-wrap items-center gap-3 mb-3">
+                        <h2 class="text-2xl font-bold">Browser Recorder</h2>
+                        <span id="practice-mode-badge" class="px-3 py-1 rounded-full bg-white/10 text-[#F5E6D3] text-xs font-semibold">Open response</span>
                     </div>
+                    <p id="practice-mode-description" class="text-sm text-[#F5E6D3]/80 leading-6 mb-5">Select a task above, then record your response.</p>
+                    <div id="selected-task-indicator" class="mb-4 hidden">
+                        <span class="text-xs font-semibold uppercase text-[#C9A961]">Selected:</span>
+                        <div id="selected-task-title" class="text-sm font-medium mt-1"></div>
+                    </div>
+                    <div id="selected-target-box" class="hidden rounded-2xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-[#F5E6D3] leading-6 mb-4"></div>
                     <div class="flex flex-col gap-3">
-                        <button id="start-speaking" class="w-full rounded-2xl bg-[#C9A961] hover:bg-[#D8B777] text-[#4A2C2A] px-4 py-3 font-semibold disabled:opacity-50" disabled>
-                            Start Recording
-                        </button>
-                        <button id="stop-speaking" class="w-full rounded-2xl bg-white/10 text-white px-4 py-3 font-semibold hidden">
-                            Stop Recording
-                        </button>
-                        <button id="submit-recording" class="w-full rounded-2xl bg-green-600 hover:bg-green-700 text-white px-4 py-3 font-semibold hidden">
-                            Submit Recording
-                        </button>
-                        <button id="retry-speaking" class="w-full rounded-2xl bg-[#E8D9C9] hover:bg-[#EEDFCF] text-[#4A2C2A] px-4 py-3 font-semibold hidden">
-                            Record Again
-                        </button>
+                        <button id="start-speaking" class="w-full rounded-2xl bg-[#C9A961] hover:bg-[#D8B777] text-[#4A2C2A] px-4 py-3 font-semibold disabled:opacity-50" disabled>Start Recording</button>
+                        <button id="stop-speaking" class="w-full rounded-2xl bg-white/10 text-white px-4 py-3 font-semibold hidden">Stop Recording</button>
+                        <button id="submit-recording" class="w-full rounded-2xl bg-green-600 hover:bg-green-700 text-white px-4 py-3 font-semibold hidden">Submit Recording</button>
+                        <button id="retry-speaking" class="w-full rounded-2xl bg-[#E8D9C9] hover:bg-[#EEDFCF] text-[#4A2C2A] px-4 py-3 font-semibold hidden">Record Again</button>
                     </div>
                     <div id="submission-message" class="mt-3 rounded-xl border px-3 py-2 text-sm hidden"></div>
-                    <div id="recording-status" class="mt-3 text-center text-xs text-[#F5E6D3]/60 hidden">
-                        Recording... <span id="recording-timer">00:00</span>
-                    </div>
+                    <div id="recording-status" class="mt-3 text-center text-xs text-[#F5E6D3]/60 hidden">Recording... <span id="recording-timer">00:00</span></div>
                 </div>
 
                 <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-6">
@@ -115,43 +133,45 @@
                     <div id="no-preview" class="text-sm text-[#6B3D2E]/60 italic">Record something to preview it here.</div>
                 </div>
 
-                <!-- AI Evaluation Results -->
                 <div id="evaluation-box" class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-6 hidden">
                     <h3 class="text-lg font-bold text-[#4A2C2A] mb-4">AI Evaluation</h3>
-                    
                     <div class="flex items-center justify-between mb-4 pb-4 border-b border-[#F6F0E8]">
                         <span class="text-[#6B3D2E] font-medium text-sm">Overall Score</span>
-                        <div class="text-2xl font-bold text-[#C9A961]" id="eval-score">0 / 100</div>
+                        <div id="eval-score" class="text-2xl font-bold text-[#C9A961]">0 / 100</div>
                     </div>
-
                     <div class="space-y-4">
-                        <div class="eval-metric-item">
+                        <div>
                             <div class="flex justify-between text-xs font-semibold uppercase text-[#6B3D2E] mb-1">
-                                <span>Fluency</span>
+                                <span id="eval-fluency-label">Fluency</span>
                                 <span id="eval-fluency-score">0 / 10</span>
                             </div>
-                            <p class="text-xs text-[#6B3D2E]/80 italic" id="eval-fluency-comment"></p>
+                            <p id="eval-fluency-comment" class="text-xs text-[#6B3D2E]/80 italic"></p>
                         </div>
-
-                        <div class="eval-metric-item">
+                        <div>
                             <div class="flex justify-between text-xs font-semibold uppercase text-[#6B3D2E] mb-1">
-                                <span>Relevance</span>
+                                <span id="eval-secondary-label">Relevance</span>
                                 <span id="eval-relevance-score">0 / 10</span>
                             </div>
-                            <p class="text-xs text-[#6B3D2E]/80 italic" id="eval-relevance-comment"></p>
+                            <p id="eval-relevance-comment" class="text-xs text-[#6B3D2E]/80 italic"></p>
                         </div>
-
-                        <div class="eval-metric-item">
+                        <div>
                             <div class="flex justify-between text-xs font-semibold uppercase text-[#6B3D2E] mb-1">
-                                <span>Pronunciation</span>
+                                <span id="eval-pronunciation-label">Pronunciation</span>
                                 <span id="eval-pronunciation-score">0 / 10</span>
                             </div>
-                            <p class="text-xs text-[#6B3D2E]/80 italic" id="eval-pronunciation-comment"></p>
+                            <p id="eval-pronunciation-comment" class="text-xs text-[#6B3D2E]/80 italic"></p>
                         </div>
-
+                        <div id="eval-target-wrapper" class="hidden mt-4 pt-4 border-t border-[#F6F0E8]">
+                            <span class="text-xs font-semibold uppercase text-[#6B3D2E] block mb-2">Target Clip</span>
+                            <div id="eval-target-text" class="text-sm text-[#4A2C2A] leading-6 bg-[#FAF4EC] rounded-xl p-3"></div>
+                        </div>
+                        <div id="eval-transcript-wrapper" class="hidden mt-4 pt-4 border-t border-[#F6F0E8]">
+                            <span class="text-xs font-semibold uppercase text-[#6B3D2E] block mb-2">AI Transcript</span>
+                            <div id="eval-transcript" class="text-sm text-[#4A2C2A] leading-6 bg-[#FAF4EC] rounded-xl p-3"></div>
+                        </div>
                         <div class="mt-4 pt-4 border-t border-[#F6F0E8]">
                             <span class="text-xs font-semibold uppercase text-[#6B3D2E] block mb-2">Detailed Feedback</span>
-                            <div class="text-sm text-[#4A2C2A] leading-6 bg-[#FAF4EC] rounded-xl p-3" id="eval-feedback"></div>
+                            <div id="eval-feedback" class="text-sm text-[#4A2C2A] leading-6 bg-[#FAF4EC] rounded-xl p-3"></div>
                         </div>
                     </div>
                 </div>
@@ -161,16 +181,31 @@
 </div>
 @endsection
 
+@push('styles')
+<style>
+    .training-sidebar-scroll { scrollbar-width: thin; scrollbar-color: #c9a961 #f6f0e8; }
+    .training-sidebar-scroll::-webkit-scrollbar { width: 10px; }
+    .training-sidebar-scroll::-webkit-scrollbar-track { background: #f6f0e8; border-radius: 999px; }
+    .training-sidebar-scroll::-webkit-scrollbar-thumb { background: #c9a961; border-radius: 999px; border: 2px solid #f6f0e8; }
+</style>
+@endpush
+
 @push('scripts')
 <script>
 let speakingRecorder = null;
 let speakingChunks = [];
-let selectedExerciseId = null;
 let recordingStartTime = null;
 let timerInterval = null;
 let currentBlob = null;
-const pageOpenedAt = Date.now();
+let currentClipEndTime = null;
+let selectedExerciseId = @json($firstExercise?->id);
+let selectedClipId = @json($firstShadowingClip['id'] ?? null);
+let activePracticeMode = selectedClipId ? 'shadowing' : 'open_response';
 
+const shadowingClips = @json($shadowingClips);
+const firstExerciseId = @json($firstExercise?->id);
+const pageOpenedAt = Date.now();
+const clipPlayer = document.getElementById('shadowing-audio-player');
 const startSpeaking = document.getElementById('start-speaking');
 const stopSpeaking = document.getElementById('stop-speaking');
 const submitRecording = document.getElementById('submit-recording');
@@ -181,16 +216,18 @@ const statusDiv = document.getElementById('recording-status');
 const timerSpan = document.getElementById('recording-timer');
 const selectedTaskIndicator = document.getElementById('selected-task-indicator');
 const selectedTaskTitle = document.getElementById('selected-task-title');
+const selectedTargetBox = document.getElementById('selected-target-box');
 const submissionMessage = document.getElementById('submission-message');
+const practiceModeBadge = document.getElementById('practice-mode-badge');
+const practiceModeDescription = document.getElementById('practice-mode-description');
 
 function showSubmissionMessage(message, type = 'info') {
-    const typeClasses = {
+    const map = {
         info: 'border-[#E8D9C9] bg-[#FAF4EC] text-[#3A2A22]',
         success: 'border-green-200 bg-green-50 text-green-700',
         error: 'border-red-200 bg-red-50 text-red-700',
     };
-
-    submissionMessage.className = `mt-3 rounded-xl border px-3 py-2 text-sm ${typeClasses[type] || typeClasses.info}`;
+    submissionMessage.className = `mt-3 rounded-xl border px-3 py-2 text-sm ${map[type] || map.info}`;
     submissionMessage.textContent = message;
     submissionMessage.classList.remove('hidden');
 }
@@ -200,24 +237,49 @@ function hideSubmissionMessage() {
     submissionMessage.className = 'mt-3 rounded-xl border px-3 py-2 text-sm hidden';
 }
 
-function selectExercise(element) {
-    // UI update
-    document.querySelectorAll('.exercise-item').forEach(el => {
+function findClip(clipId) {
+    return shadowingClips.find((clip) => clip.id === clipId) || null;
+}
+
+function setRecorderContext(title, mode, targetText = '') {
+    selectedTaskTitle.textContent = title;
+    selectedTaskIndicator.classList.remove('hidden');
+
+    if (mode === 'shadowing') {
+        practiceModeBadge.textContent = 'Shadowing';
+        practiceModeDescription.textContent = 'Repeat the short clip as closely as you can. Scoring focuses on accuracy, fluency, and pronunciation.';
+        selectedTargetBox.textContent = targetText;
+        selectedTargetBox.classList.toggle('hidden', !targetText);
+    } else {
+        practiceModeBadge.textContent = 'Open response';
+        practiceModeDescription.textContent = 'Give a longer spoken response to the selected prompt. Scoring focuses on relevance, fluency, and pronunciation.';
+        selectedTargetBox.classList.add('hidden');
+    }
+
+    startSpeaking.disabled = !selectedExerciseId;
+}
+
+function highlightSelection() {
+    document.querySelectorAll('.exercise-item,.shadowing-clip-item').forEach((el) => {
         el.classList.remove('border-[#C9A961]', 'bg-[#FFF9F2]');
         el.classList.add('bg-[#FBF7F1]');
     });
-    element.classList.add('border-[#C9A961]', 'bg-[#FFF9F2]');
-    element.classList.remove('bg-[#FBF7F1]');
 
-    selectedExerciseId = element.dataset.exerciseId;
-    const title = element.querySelector('.text-xs').textContent.trim();
-    
-    selectedTaskTitle.textContent = title;
-    selectedTaskIndicator.classList.remove('hidden');
-    startSpeaking.disabled = false;
-    
-    // Reset buttons if they were in a different state
-    resetRecorderUI();
+    if (activePracticeMode === 'open_response' && selectedExerciseId) {
+        const node = document.querySelector(`.exercise-item[data-exercise-id="${selectedExerciseId}"]`);
+        if (node) {
+            node.classList.add('border-[#C9A961]', 'bg-[#FFF9F2]');
+            node.classList.remove('bg-[#FBF7F1]');
+        }
+    }
+
+    if (activePracticeMode === 'shadowing' && selectedClipId) {
+        const node = document.querySelector(`.shadowing-clip-item[data-clip-id="${selectedClipId}"]`);
+        if (node) {
+            node.classList.add('border-[#C9A961]', 'bg-[#FFF9F2]');
+            node.classList.remove('bg-[#FBF7F1]');
+        }
+    }
 }
 
 function resetRecorderUI() {
@@ -240,9 +302,80 @@ function resetRecorderUI() {
     speakingChunks = [];
 }
 
+function selectExercise(element) {
+    selectedExerciseId = Number(element.dataset.exerciseId);
+    selectedClipId = null;
+    activePracticeMode = 'open_response';
+    setRecorderContext(element.querySelector('.text-xs').textContent.trim(), 'open_response');
+    highlightSelection();
+    resetRecorderUI();
+    hideSubmissionMessage();
+}
+
+function selectShadowingClip(element) {
+    const clip = findClip(element.dataset.clipId);
+    if (!clip) {
+        return;
+    }
+
+    if (!selectedExerciseId && firstExerciseId) {
+        selectedExerciseId = firstExerciseId;
+    }
+
+    selectedClipId = clip.id;
+    activePracticeMode = 'shadowing';
+    setRecorderContext(clip.title, 'shadowing', clip.transcript);
+    highlightSelection();
+    resetRecorderUI();
+    hideSubmissionMessage();
+}
+
+function ensureClipPlayerReady() {
+    if (!clipPlayer) {
+        return Promise.reject(new Error('No clip player.'));
+    }
+
+    if (Number.isFinite(clipPlayer.duration) && clipPlayer.duration > 0) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+        clipPlayer.addEventListener('loadedmetadata', () => resolve(), { once: true });
+        clipPlayer.addEventListener('error', () => reject(new Error('Audio metadata failed to load.')), { once: true });
+        clipPlayer.load();
+    });
+}
+
+function stopClipPlayback() {
+    if (!clipPlayer) {
+        return;
+    }
+    clipPlayer.pause();
+    currentClipEndTime = null;
+}
+
+async function playShadowingClip(clipId) {
+    const clip = findClip(clipId);
+    if (!clip || !clipPlayer) {
+        return;
+    }
+
+    try {
+        await ensureClipPlayerReady();
+        const duration = clipPlayer.duration;
+        const startTime = Math.max(0, Math.min(duration - 1, duration * Number(clip.start_ratio || 0)));
+        const endTime = Math.max(startTime + 1.2, Math.min(duration, duration * Number(clip.end_ratio || 0)));
+        currentClipEndTime = endTime;
+        clipPlayer.currentTime = startTime;
+        await clipPlayer.play();
+    } catch (error) {
+        console.error('Clip playback error:', error);
+        showSubmissionMessage('The short clip could not be played. Please use the full audio player above.', 'error');
+    }
+}
+
 function updateTimer() {
-    const now = new Date();
-    const diff = Math.floor((now - recordingStartTime) / 1000);
+    const diff = Math.floor((new Date() - recordingStartTime) / 1000);
     const mins = Math.floor(diff / 60).toString().padStart(2, '0');
     const secs = (diff % 60).toString().padStart(2, '0');
     timerSpan.textContent = `${mins}:${secs}`;
@@ -272,15 +405,13 @@ startSpeaking.addEventListener('click', async () => {
         };
 
         speakingRecorder.start();
-        
         recordingStartTime = new Date();
-        timerSpan.textContent = "00:00";
+        timerSpan.textContent = '00:00';
         timerInterval = setInterval(updateTimer, 1000);
 
         startSpeaking.classList.add('hidden');
         stopSpeaking.classList.remove('hidden');
         statusDiv.classList.remove('hidden');
-        
     } catch (error) {
         console.error('Error accessing microphone:', error);
         showSubmissionMessage('Could not access microphone. Please ensure you have given permission.', 'error');
@@ -295,7 +426,9 @@ stopSpeaking.addEventListener('click', () => {
 });
 
 submitRecording.addEventListener('click', async () => {
-    if (!currentBlob || !selectedExerciseId) return;
+    if (!currentBlob || !selectedExerciseId) {
+        return;
+    }
 
     hideSubmissionMessage();
     submitRecording.disabled = true;
@@ -303,81 +436,80 @@ submitRecording.addEventListener('click', async () => {
 
     const formData = new FormData();
     formData.append('audio', currentBlob, 'recording.webm');
-    formData.append('exercise_id', selectedExerciseId);
+    formData.append('exercise_id', String(selectedExerciseId));
     formData.append('page_opened_at', String(pageOpenedAt));
+    formData.append('practice_mode', activePracticeMode);
+
+    if (activePracticeMode === 'shadowing' && selectedClipId) {
+        formData.append('shadowing_clip_id', selectedClipId);
+    }
+
     formData.append('_token', '{{ csrf_token() }}');
 
     try {
         const response = await fetch("{{ route('articles.speaking.submit', $article) }}", {
             method: 'POST',
             body: formData,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
         });
 
         const result = await response.json();
-        if (result.success) {
-            showSubmissionMessage('Submitted successfully. You can review your score below.', 'success');
-            
-            // Display AI Evaluation Results
-            if (result.evaluation) {
-                const eval = result.evaluation;
-                const normalizedScore = Number(eval.score ?? 0);
-                document.getElementById('eval-score').textContent = `${Number.isFinite(normalizedScore) ? normalizedScore : 0} / 100`;
+        if (!result.success) {
+            throw new Error(result.message || 'Unknown error');
+        }
 
-                const metricFields = [
-                    ['fluency', 'eval-fluency-score', 'eval-fluency-comment'],
-                    ['relevance', 'eval-relevance-score', 'eval-relevance-comment'],
-                    ['pronunciation', 'eval-pronunciation-score', 'eval-pronunciation-comment'],
-                ];
+        showSubmissionMessage('Submitted successfully. You can review your score below.', 'success');
 
-                metricFields.forEach(([metricName, scoreId, commentId]) => {
-                    const metric = eval[metricName];
-                    const scoreEl = document.getElementById(scoreId);
-                    const commentEl = document.getElementById(commentId);
+        const evalResult = result.evaluation || {};
+        const labels = evalResult.metric_labels || {};
+        const score = Number(evalResult.score ?? 0);
+        document.getElementById('eval-score').textContent = `${Number.isFinite(score) ? score : 0} / 100`;
+        document.getElementById('eval-fluency-label').textContent = labels.fluency || 'Fluency';
+        document.getElementById('eval-secondary-label').textContent = labels.relevance || 'Relevance';
+        document.getElementById('eval-pronunciation-label').textContent = labels.pronunciation || 'Pronunciation';
 
-                    let score = 0;
-                    let comment = '';
+        [
+            ['fluency', 'eval-fluency-score', 'eval-fluency-comment'],
+            ['relevance', 'eval-relevance-score', 'eval-relevance-comment'],
+            ['pronunciation', 'eval-pronunciation-score', 'eval-pronunciation-comment'],
+        ].forEach(([name, scoreId, commentId]) => {
+            const metric = evalResult[name];
+            const scoreEl = document.getElementById(scoreId);
+            const commentEl = document.getElementById(commentId);
+            let metricScore = 0;
+            let comment = '';
 
-                    if (typeof metric === 'number') {
-                        score = metric;
-                    } else if (typeof metric === 'string') {
-                        comment = metric;
-                        const extracted = metric.match(/\d+(\.\d+)?/);
-                        if (extracted) {
-                            score = Number(extracted[0]);
-                        }
-                    } else if (metric && typeof metric === 'object') {
-                        score = Number(metric.score ?? 0);
-                        comment = metric.comment ?? metric.feedback ?? '';
-                    }
-
-                    scoreEl.textContent = `${Number.isFinite(score) ? score : 0} / 10`;
-                    commentEl.textContent = comment;
-                });
-
-                document.getElementById('eval-feedback').textContent = eval.feedback || 'No feedback provided.';
-                
-                document.getElementById('evaluation-box').classList.remove('hidden');
-                document.getElementById('evaluation-box').scrollIntoView({ behavior: 'smooth' });
+            if (typeof metric === 'number') {
+                metricScore = metric;
+            } else if (typeof metric === 'string') {
+                comment = metric;
+                const match = metric.match(/\d+(\.\d+)?/);
+                if (match) {
+                    metricScore = Number(match[0]);
+                }
+            } else if (metric && typeof metric === 'object') {
+                metricScore = Number(metric.score ?? 0);
+                comment = metric.comment ?? metric.feedback ?? '';
             }
 
-            // Update UI
-            submitRecording.textContent = 'Submitted';
-            submitRecording.classList.remove('bg-green-600', 'hover:bg-green-700');
-            submitRecording.classList.add('bg-gray-400', 'cursor-not-allowed');
-            retrySpeaking.classList.remove('hidden');
-            
-        } else {
-            showSubmissionMessage('Submission failed: ' + (result.message || 'Unknown error'), 'error');
-            submitRecording.disabled = false;
-            submitRecording.textContent = 'Submit Recording';
-            retrySpeaking.classList.remove('hidden');
-        }
+            scoreEl.textContent = `${Number.isFinite(metricScore) ? metricScore : 0} / 10`;
+            commentEl.textContent = comment;
+        });
+
+        document.getElementById('eval-target-text').textContent = evalResult.target_text || '';
+        document.getElementById('eval-target-wrapper').classList.toggle('hidden', !evalResult.target_text);
+        document.getElementById('eval-transcript').textContent = evalResult.transcript || '';
+        document.getElementById('eval-transcript-wrapper').classList.toggle('hidden', !evalResult.transcript);
+        document.getElementById('eval-feedback').textContent = evalResult.feedback || 'No feedback provided.';
+        document.getElementById('evaluation-box').classList.remove('hidden');
+
+        submitRecording.textContent = 'Submitted';
+        submitRecording.classList.remove('bg-green-600', 'hover:bg-green-700');
+        submitRecording.classList.add('bg-gray-400', 'cursor-not-allowed');
+        retrySpeaking.classList.remove('hidden');
     } catch (error) {
         console.error('Submission error:', error);
-        showSubmissionMessage('An error occurred during submission. Please try recording again.', 'error');
+        showSubmissionMessage(`Submission failed: ${error.message}`, 'error');
         submitRecording.disabled = false;
         submitRecording.textContent = 'Submit Recording';
         retrySpeaking.classList.remove('hidden');
@@ -391,8 +523,41 @@ retrySpeaking.addEventListener('click', () => {
     showSubmissionMessage('Ready. Click "Start Recording" to try again.', 'info');
 });
 
-// Auto-select the first exercise on page load
+document.querySelectorAll('.exercise-item').forEach((item) => {
+    item.addEventListener('click', () => selectExercise(item));
+});
+
+document.querySelectorAll('.shadowing-clip-item').forEach((item) => {
+    item.addEventListener('click', () => selectShadowingClip(item));
+});
+
+document.querySelectorAll('.play-shadowing-clip').forEach((button) => {
+    button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        playShadowingClip(button.dataset.clipId);
+    });
+});
+
+if (clipPlayer) {
+    clipPlayer.addEventListener('timeupdate', () => {
+        if (currentClipEndTime !== null && clipPlayer.currentTime >= currentClipEndTime) {
+            stopClipPlayback();
+        }
+    });
+    clipPlayer.addEventListener('ended', () => {
+        currentClipEndTime = null;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    if (selectedClipId) {
+        const firstClip = document.querySelector(`.shadowing-clip-item[data-clip-id="${selectedClipId}"]`);
+        if (firstClip) {
+            selectShadowingClip(firstClip);
+            return;
+        }
+    }
+
     const firstExercise = document.querySelector('.exercise-item');
     if (firstExercise) {
         selectExercise(firstExercise);
