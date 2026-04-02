@@ -226,9 +226,18 @@ function resetRecorderUI() {
     submitRecording.classList.add('hidden');
     retrySpeaking.classList.add('hidden');
     statusDiv.classList.add('hidden');
+    clearInterval(timerInterval);
+    timerSpan.textContent = '00:00';
+    submitRecording.disabled = false;
+    submitRecording.textContent = 'Submit Recording';
+    submitRecording.classList.remove('bg-gray-400', 'cursor-not-allowed');
+    submitRecording.classList.add('bg-green-600', 'hover:bg-green-700');
     speakingPreview.classList.add('hidden');
+    speakingPreview.removeAttribute('src');
+    speakingPreview.load();
     noPreview.classList.remove('hidden');
     currentBlob = null;
+    speakingChunks = [];
 }
 
 function updateTimer() {
