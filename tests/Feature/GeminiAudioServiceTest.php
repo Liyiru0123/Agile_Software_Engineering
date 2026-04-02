@@ -73,4 +73,58 @@ class GeminiAudioServiceTest extends TestCase
                 && data_get($request->data(), 'messages.1.content.1.type') === 'input_audio';
         });
     }
+
+    public function test_gemini_audio_service_supports_shadowing_mode_labels(): void
+    {
+        config([
+            'services.gemini.api_key' => 'test-gemini-key',
+            'services.gemini.model' => 'gemini-2.5-flash',
+            'services.gemini.base_url' => 'https://moyu.info/v1',
+        ]);
+
+        Http::fake([
+            'https://moyu.info/v1/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'score' => 84,
+                                'fluency' => [
+                                    'score' => 8,
+                                    'comment' => 'The clip is delivered smoothly overall.',
+                                ],
+                                'accuracy' => [
+                                    'score' => 7.5,
+                                    'comment' => 'Most key words are repeated correctly with a few omissions.',
+                                ],
+                                'pronunciation' => [
+                                    'score' => 8.2,
+                                    'comment' => 'Pronunciation is mostly clear and intelligible.',
+                                ],
+                                'transcript' => 'Autonomous transit systems could reduce congestion in large cities.',
+                                'feedback' => 'Good shadowing attempt. Keep the wording tighter and reduce skipped words.',
+                            ], JSON_UNESCAPED_SLASHES),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $audio = UploadedFile::fake()->createWithContent('sample.webm', 'fake-audio-content');
+
+        $result = app(GeminiAudioService::class)->evaluateAudio(
+            $audio,
+            [
+                'mode' => 'shadowing',
+                'instruction' => 'Repeat the short clip as accurately as possible.',
+                'target_text' => 'Autonomous transit systems could reduce congestion in large cities.',
+            ],
+            'The article is about autonomous public transport.',
+        );
+
+        $this->assertSame('shadowing', $result['mode']);
+        $this->assertSame('Accuracy', $result['metric_labels']['relevance']);
+        $this->assertSame(7.5, $result['relevance']['score']);
+        $this->assertSame('Autonomous transit systems could reduce congestion in large cities.', $result['transcript']);
+    }
 }

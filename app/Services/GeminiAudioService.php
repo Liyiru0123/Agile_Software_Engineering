@@ -24,7 +24,7 @@ class GeminiAudioService
     /**
      * Evaluate speaking audio using Gemini.
      */
-    public function evaluateAudio(UploadedFile $audioFile, string $taskInstruction, string $articleContent): array
+    public function evaluateAudio(UploadedFile $audioFile, string|array $taskInstruction, string $articleContent): array
     {
         if (empty($this->apiKey)) {
             Log::error('Gemini API key is not configured.');
@@ -34,21 +34,67 @@ class GeminiAudioService
         try {
             $audioBase64 = base64_encode(file_get_contents($audioFile->getRealPath()));
             $mimeType = (string) ($audioFile->getMimeType() ?: 'audio/mpeg');
-            $prompt = $this->buildEvaluationPrompt($taskInstruction, $articleContent);
+            $taskContext = $this->normalizeTaskContext($taskInstruction);
+            $prompt = $this->buildEvaluationPrompt($taskContext, $articleContent);
 
             if ($this->usesCompatibleChatApi()) {
-                return $this->evaluateWithCompatibleApi($audioBase64, $mimeType, $audioFile, $prompt);
+                return $this->evaluateWithCompatibleApi($audioBase64, $mimeType, $audioFile, $prompt, $taskContext);
             }
 
-            return $this->evaluateWithNativeGeminiApi($audioBase64, $mimeType, $prompt);
+            return $this->evaluateWithNativeGeminiApi($audioBase64, $mimeType, $prompt, $taskContext);
         } catch (\Exception $e) {
             Log::error('Error in Gemini evaluation: ' . $e->getMessage());
             return ['error' => 'An unexpected error occurred during AI evaluation.'];
         }
     }
 
-    protected function buildEvaluationPrompt(string $taskInstruction, string $articleContent): string
+    protected function normalizeTaskContext(string|array $taskInstruction): array
     {
+        if (is_array($taskInstruction)) {
+            return [
+                'mode' => (string) ($taskInstruction['mode'] ?? 'open_response'),
+                'instruction' => (string) ($taskInstruction['instruction'] ?? 'Respond to the speaking task.'),
+                'target_text' => isset($taskInstruction['target_text']) ? (string) $taskInstruction['target_text'] : null,
+                'title' => (string) ($taskInstruction['title'] ?? 'Speaking Task'),
+            ];
+        }
+
+        return [
+            'mode' => 'open_response',
+            'instruction' => $taskInstruction,
+            'target_text' => null,
+            'title' => 'Speaking Task',
+        ];
+    }
+
+    protected function buildEvaluationPrompt(array $taskContext, string $articleContent): string
+    {
+        $taskInstruction = $taskContext['instruction'];
+
+        if (($taskContext['mode'] ?? 'open_response') === 'shadowing' && filled($taskContext['target_text'] ?? null)) {
+            $targetText = (string) $taskContext['target_text'];
+
+            return <<<PROMPT
+You are an expert English shadowing examiner. The learner listened to a short audio clip and tried to repeat it.
+
+Task: {$taskInstruction}
+Target excerpt: "{$targetText}"
+Article Context (Reference): {$articleContent}
+
+Please first infer a transcript of the learner's speech from the audio, then compare it with the target excerpt.
+
+Provide a JSON response with the following keys:
+- score: An overall score out of 100.
+- fluency: Score out of 10 and a brief comment about smoothness and pacing.
+- accuracy: Score out of 10 and a brief comment about how closely the learner matched the target wording and meaning.
+- pronunciation: Score out of 10 and a brief comment about clarity and intelligibility.
+- transcript: The learner's inferred transcript in plain English.
+- feedback: A concise summary of strengths and the next revision priority in English.
+
+Return ONLY the JSON object.
+PROMPT;
+        }
+
         return <<<PROMPT
 You are an expert English speaking examiner. Please evaluate the following spoken response based on the article content and task instruction provided.
 
@@ -60,13 +106,14 @@ Provide a JSON response with the following keys:
 - fluency: Score out of 10 and a brief comment.
 - relevance: Score out of 10 and a brief comment (how well it addresses the task and article).
 - pronunciation: Score out of 10 and a brief comment.
+- transcript: A short inferred transcript of the learner's response in plain English.
 - feedback: A concise summary of strengths and areas for improvement in English.
 
 Return ONLY the JSON object.
 PROMPT;
     }
 
-    protected function evaluateWithNativeGeminiApi(string $audioBase64, string $mimeType, string $prompt): array
+    protected function evaluateWithNativeGeminiApi(string $audioBase64, string $mimeType, string $prompt, array $taskContext): array
     {
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
@@ -97,14 +144,15 @@ PROMPT;
 
         $textResponse = (string) ($response->json('candidates.0.content.parts.0.text') ?? '{}');
 
-        return $this->decodeEvaluationPayload($textResponse, 'Gemini returned an invalid evaluation payload.');
+        return $this->decodeEvaluationPayload($textResponse, 'Gemini returned an invalid evaluation payload.', $taskContext);
     }
 
     protected function evaluateWithCompatibleApi(
         string $audioBase64,
         string $mimeType,
         UploadedFile $audioFile,
-        string $prompt
+        string $prompt,
+        array $taskContext
     ): array {
         $payload = [
             'model' => $this->model,
@@ -158,7 +206,11 @@ PROMPT;
             return ['error' => 'Gemini-compatible API returned an empty evaluation result.'];
         }
 
-        return $this->decodeEvaluationPayload($textResponse, 'Gemini-compatible API returned an invalid evaluation payload.');
+        return $this->decodeEvaluationPayload(
+            $textResponse,
+            'Gemini-compatible API returned an invalid evaluation payload.',
+            $taskContext
+        );
     }
 
     protected function failedResponse(string $logMessage, \Illuminate\Http\Client\Response $response): array
@@ -176,7 +228,7 @@ PROMPT;
         ];
     }
 
-    protected function decodeEvaluationPayload(?string $payload, string $fallbackMessage): array
+    protected function decodeEvaluationPayload(?string $payload, string $fallbackMessage, array $taskContext): array
     {
         if (! is_string($payload) || trim($payload) === '') {
             return ['error' => $fallbackMessage];
@@ -199,14 +251,21 @@ PROMPT;
             return ['error' => $fallbackMessage];
         }
 
-        return $this->normalizeEvaluation($decoded);
+        return $this->normalizeEvaluation($decoded, $taskContext);
     }
 
-    protected function normalizeEvaluation(array $decoded): array
+    protected function normalizeEvaluation(array $decoded, array $taskContext): array
     {
+        $isShadowing = ($taskContext['mode'] ?? 'open_response') === 'shadowing';
+        $secondaryMetric = $isShadowing ? 'accuracy' : 'relevance';
+
+        if ($isShadowing && ! isset($decoded['accuracy']) && isset($decoded['relevance'])) {
+            $decoded['accuracy'] = $decoded['relevance'];
+        }
+
         $decoded['score'] = is_numeric($decoded['score'] ?? null) ? (float) $decoded['score'] : 0;
 
-        foreach (['fluency', 'relevance', 'pronunciation'] as $metric) {
+        foreach (['fluency', $secondaryMetric, 'pronunciation'] as $metric) {
             if (! isset($decoded[$metric]) || ! is_array($decoded[$metric])) {
                 $decoded[$metric] = [
                     'score' => 0,
@@ -220,7 +279,26 @@ PROMPT;
             $decoded[$metric]['comment'] = (string) ($decoded[$metric]['comment'] ?? '');
         }
 
+        if ($isShadowing) {
+            $decoded['accuracy'] = $decoded['accuracy'] ?? $decoded[$secondaryMetric];
+            $decoded['relevance'] = $decoded['accuracy'];
+        }
+
+        if (! $isShadowing && ! isset($decoded['relevance'])) {
+            $decoded['relevance'] = [
+                'score' => 0,
+                'comment' => '',
+            ];
+        }
+
+        $decoded['transcript'] = (string) ($decoded['transcript'] ?? '');
         $decoded['feedback'] = (string) ($decoded['feedback'] ?? 'No feedback provided.');
+        $decoded['mode'] = $taskContext['mode'] ?? 'open_response';
+        $decoded['metric_labels'] = [
+            'fluency' => 'Fluency',
+            'relevance' => $isShadowing ? 'Accuracy' : 'Relevance',
+            'pronunciation' => 'Pronunciation',
+        ];
 
         return $decoded;
     }

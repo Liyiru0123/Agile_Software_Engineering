@@ -159,7 +159,7 @@
                 </div>
             </section>
 
-            <aside class="space-y-6 sticky top-24">
+            <aside class="space-y-6 sticky top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2 training-sidebar-scroll">
                 <div class="bg-white rounded-[2rem] border border-[#E0D2C2] shadow-sm p-6">
                     <h3 class="text-xl font-bold text-[#4A2C2A] mb-4">Rubric Focus</h3>
                     <ul id="rubric-focus-list" class="space-y-3 text-sm text-[#6B3D2E] leading-6">
@@ -203,6 +203,30 @@
     </div>
 </div>
 @endsection
+
+@push('styles')
+<style>
+    .training-sidebar-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #c9a961 #f6f0e8;
+    }
+
+    .training-sidebar-scroll::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    .training-sidebar-scroll::-webkit-scrollbar-track {
+        background: #f6f0e8;
+        border-radius: 999px;
+    }
+
+    .training-sidebar-scroll::-webkit-scrollbar-thumb {
+        background: #c9a961;
+        border-radius: 999px;
+        border: 2px solid #f6f0e8;
+    }
+</style>
+@endpush
 
 @push('scripts')
 <script>

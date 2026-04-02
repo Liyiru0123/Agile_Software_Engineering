@@ -4,13 +4,13 @@
 
 @section('content')
 <div class="min-h-screen bg-[#F6F0E8] py-10">
-    <div class="max-w-7xl mx-auto px-6">
+    <div class="max-w-[1600px] mx-auto px-6">
         <a href="{{ route('articles.index') }}" class="inline-flex items-center text-sm text-[#6B3D2E] hover:text-[#4A2C2A] mb-6">
             Back to Library
         </a>
 
-        <div class="grid lg:grid-cols-[minmax(0,1.5fr)_380px] gap-8 items-start">
-            <section class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8 lg:p-10">
+        <div class="grid lg:grid-cols-[minmax(0,1.85fr)_400px] gap-8 items-start">
+            <section class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8 lg:p-10 lg:h-[calc(100vh-5.5rem)] lg:flex lg:flex-col">
                 <div class="flex flex-wrap items-center gap-3 mb-4">
                     <span class="px-3 py-1 rounded-full bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs font-semibold">
                         {{ $difficultyLabel }}
@@ -26,11 +26,28 @@
                     </span>
                 </div>
 
-                <h1 class="text-4xl font-bold text-[#4A2C2A] mb-4 leading-tight">{{ $article->title }}</h1>
-                <p class="text-[#6B3D2E] text-lg leading-8 mb-8">{{ $articleSummary }}</p>
+                <h1 class="text-4xl font-bold text-[#4A2C2A] mb-3 leading-tight">{{ $article->title }}</h1>
+                <p class="text-[#6B3D2E] text-lg leading-8 mb-5">{{ $articleSummary }}</p>
+
+                <div class="mb-5 rounded-2xl bg-[#FBF7F1] border border-[#E8D9C9] p-4">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <div class="text-xs uppercase tracking-[0.18em] text-[#9A7358] font-semibold">Quick Start</div>
+                        <div class="text-xs text-[#8A654E]">Open a training page instantly</div>
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                        @foreach($trainingCards as $card)
+                            <a href="{{ $card['route'] }}"
+                               class="rounded-2xl border border-[#E4D5C6] bg-white px-4 py-4 hover:border-[#6B3D2E] hover:shadow-sm transition">
+                                <div class="text-sm font-bold text-[#4A2C2A]">{{ $card['title'] }}</div>
+                                <div class="text-xs text-[#8A654E] mt-1">{{ $card['status'] }}</div>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
 
                 @if($audioUrl)
-                    <div class="mb-8 p-4 rounded-2xl bg-[#FAF4EC] border border-[#E8D9C9]">
+                    <div class="mb-5 p-4 rounded-2xl bg-[#FAF4EC] border border-[#E8D9C9]">
                         <div class="text-sm text-[#6B3D2E] font-semibold mb-2">Article Audio</div>
                         <audio controls class="w-full">
                             <source src="{{ $audioUrl }}">
@@ -39,14 +56,14 @@
                     </div>
                 @endif
 
-                <div class="space-y-6 text-[#3A2A22] leading-8 text-[17px]">
+                <div class="space-y-6 text-[#3A2A22] leading-8 text-[17px] lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-3 article-body-scroll">
                     @foreach($paragraphs as $paragraph)
                         <p>{{ $paragraph }}</p>
                     @endforeach
                 </div>
             </section>
 
-            <aside class="space-y-5 sticky top-24">
+            <aside class="space-y-5 sticky top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2 training-hub-scroll">
                 <div class="bg-[#4A2C2A] text-white rounded-3xl p-6 shadow-lg">
                     <div class="text-xs uppercase tracking-[0.25em] text-[#D7BE8A] mb-3">Training Hub</div>
                     <h2 class="text-2xl font-bold mb-2">Choose a skill to train</h2>
@@ -75,3 +92,31 @@
     </div>
 </div>
 @endsection
+
+@push('styles')
+<style>
+    .article-body-scroll,
+    .training-hub-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #c9a961 #f6f0e8;
+    }
+
+    .article-body-scroll::-webkit-scrollbar,
+    .training-hub-scroll::-webkit-scrollbar {
+        width: 10px;
+    }
+
+    .article-body-scroll::-webkit-scrollbar-track,
+    .training-hub-scroll::-webkit-scrollbar-track {
+        background: #f6f0e8;
+        border-radius: 999px;
+    }
+
+    .article-body-scroll::-webkit-scrollbar-thumb,
+    .training-hub-scroll::-webkit-scrollbar-thumb {
+        background: #c9a961;
+        border-radius: 999px;
+        border: 2px solid #f6f0e8;
+    }
+</style>
+@endpush
