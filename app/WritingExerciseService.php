@@ -8,11 +8,15 @@ use App\Models\Exercise;
 use App\Models\Submission;
 use App\Services\ArticleTextProcessor;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class WritingExerciseService
 {
+    protected array $lastAiFailures = [];
+
     private const CORE_TASK_TYPES = [
         'summary_response',
         'paraphrase',
@@ -99,7 +103,8 @@ class WritingExerciseService
                 ->values()
                 ->all(),
             'recentWritingSubmissions' => $recentSubmissions,
-            'geminiReady' => filled(config('services.gemini.api_key')),
+            'aiReady' => $this->resolveAiProvider() !== null,
+            'aiProviderLabel' => $this->resolveAiProviderLabel(),
         ];
     }
 
@@ -110,12 +115,18 @@ class WritingExerciseService
         ?int $userId = null,
         int $timeSpent = 0
     ): array {
+        $this->lastAiFailures = [];
+
         $task = $this->presentExercise($article, $exercise);
         $cleanDraft = trim($draft);
         $wordCount = $this->countWords($cleanDraft);
 
-        $result = $this->evaluateWithGemini($article, $task, $cleanDraft, $wordCount)
-            ?? $this->evaluateLocally($article, $task, $cleanDraft, $wordCount);
+        $result = $this->evaluateWithGemini($article, $task, $cleanDraft, $wordCount);
+
+        if (! $result) {
+            $result = $this->evaluateLocally($article, $task, $cleanDraft, $wordCount);
+            $result['ai_diagnostics'] = $this->buildAiDiagnostics();
+        }
 
         $result['exercise_id'] = $exercise->id;
         $result['task_type'] = $task['task_type'];
@@ -575,9 +586,13 @@ Student response ({$wordCount} words):
 PROMPT;
 
         try {
+            if ($this->usesCompatibleGeminiApi()) {
+                return $this->evaluateWithCompatibleGeminiApi($task, $prompt, $wordCount);
+            }
+
             $response = Http::timeout(60)
                 ->post(
-                    rtrim(config('services.gemini.base_url'), '/').'/'.config('services.gemini.model').':generateContent?key='.config('services.gemini.api_key'),
+                    rtrim((string) config('services.gemini.base_url'), '/').'/'.config('services.gemini.model').':generateContent?key='.config('services.gemini.api_key'),
                     [
                         'contents' => [
                             ['parts' => [['text' => $prompt]]],
@@ -590,48 +605,333 @@ PROMPT;
                 )
                 ->throw();
 
-            $text = data_get($response->json(), 'candidates.0.content.parts.0.text');
+            $this->storeRawAiResponse(
+                provider: 'gemini',
+                task: $task,
+                status: $response->status(),
+                body: $response->body(),
+            );
+
+            $payload = $response->json();
+            $text = data_get($payload, 'candidates.0.content.parts.0.text');
+            if (! is_string($text) || trim($text) === '') {
+                $this->recordAiProviderFailure(
+                    'gemini',
+                    ...$this->diagnoseAiPayloadFailure($payload, 'The provider returned no review text.')
+                );
+
+                return null;
+            }
+
             $decoded = $this->decodeJsonPayload($text);
-
             if (! is_array($decoded)) {
+                $this->recordAiProviderFailure(
+                    'gemini',
+                    'invalid_json',
+                    'The provider response was not valid JSON.',
+                    $this->summarizeRawText($text)
+                );
+
                 return null;
             }
 
-            $decoded['score'] = round((float) ($decoded['score'] ?? 0), 2);
-            $decoded['provider'] = 'gemini';
-            $decoded['strengths'] = array_values(array_slice(array_filter($decoded['strengths'] ?? [], 'is_string'), 0, 4));
-            $decoded['improvements'] = array_values(array_slice(array_filter($decoded['improvements'] ?? [], 'is_string'), 0, 5));
-            $decoded['breakdown'] = collect($decoded['breakdown'] ?? [])
-                ->map(function ($row) {
-                    return [
-                        'key' => (string) ($row['key'] ?? Str::slug((string) ($row['label'] ?? 'criterion'), '_')),
-                        'label' => (string) ($row['label'] ?? 'Criterion'),
-                        'score' => round((float) ($row['score'] ?? 0), 1),
-                        'max' => round((float) ($row['max'] ?? 25), 1),
-                        'feedback' => (string) ($row['feedback'] ?? ''),
-                    ];
-                })
-                ->filter(fn (array $row) => $row['label'] !== '')
-                ->take(4)
-                ->values()
-                ->all();
+            $normalized = $this->normalizeAiEvaluation($decoded, 'gemini', $task, $wordCount);
+            if (! $normalized) {
+                $this->recordAiProviderFailure('gemini', 'invalid_schema', 'The provider response was missing required scoring fields.');
 
-            if (($decoded['summary'] ?? '') === '' || count($decoded['breakdown']) !== 4) {
                 return null;
             }
 
-            $decoded['word_range'] = [
-                'min' => $task['word_limit']['min'],
-                'max' => $task['word_limit']['max'],
-                'in_range' => $wordCount >= $task['word_limit']['min'] && $wordCount <= $task['word_limit']['max'],
-            ];
-
-            return $decoded;
+            return $normalized;
         } catch (\Throwable $exception) {
+            $this->logAiProviderFailure('gemini', $task, $exception);
             report($exception);
 
             return null;
         }
+    }
+
+    protected function evaluateWithCompatibleGeminiApi(array $task, string $prompt, int $wordCount): ?array
+    {
+        $response = Http::timeout(90)
+            ->withToken((string) config('services.gemini.api_key'))
+            ->withHeaders([
+                'Content-Type' => 'application/json',
+            ])
+            ->post(
+                rtrim((string) config('services.gemini.base_url'), '/').'/chat/completions',
+                [
+                    'model' => (string) config('services.gemini.model', 'gemini-2.5-flash'),
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'You are a strict but fair English writing examiner.',
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => $prompt,
+                        ],
+                    ],
+                    'temperature' => 0.2,
+                ]
+            )
+            ->throw();
+
+        $this->storeRawAiResponse(
+            provider: 'gemini-compatible',
+            task: $task,
+            status: $response->status(),
+            body: $response->body(),
+        );
+
+        $payload = $response->json();
+        $text = $this->extractResponsesText($payload);
+
+        if (! is_string($text) || trim($text) === '') {
+            $this->recordAiProviderFailure(
+                'gemini',
+                ...$this->diagnoseAiPayloadFailure($payload, 'The provider returned no review text.')
+            );
+
+            return null;
+        }
+
+        $decoded = $this->decodeJsonPayload($text);
+        if (! is_array($decoded)) {
+            $this->recordAiProviderFailure(
+                'gemini',
+                'invalid_json',
+                'The provider response was not valid JSON.',
+                $this->summarizeRawText($text)
+            );
+
+            return null;
+        }
+
+        $normalized = $this->normalizeAiEvaluation($decoded, 'gemini', $task, $wordCount);
+        if (! $normalized) {
+            $this->recordAiProviderFailure('gemini', 'invalid_schema', 'The provider response was missing required scoring fields.');
+
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    protected function logAiProviderFailure(string $provider, array $task, \Throwable $exception): void
+    {
+        $reason = $exception instanceof \Illuminate\Http\Client\ConnectionException
+            ? 'connection_error'
+            : 'request_error';
+
+        $this->recordAiProviderFailure($provider, $reason, $exception->getMessage());
+
+        Log::warning('Writing AI provider failed and fell back to local rubric.', [
+            'provider' => $provider,
+            'task_id' => $task['id'] ?? null,
+            'task_type' => $task['task_type'] ?? null,
+            'exception' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'raw_excerpt' => null,
+        ]);
+    }
+
+    protected function recordAiProviderFailure(string $provider, string $reason, string $message, ?string $rawExcerpt = null): void
+    {
+        $this->lastAiFailures[] = [
+            'provider' => $provider,
+            'reason' => $reason,
+            'message' => $message,
+            'raw_excerpt' => $rawExcerpt,
+        ];
+    }
+
+    protected function buildAiDiagnostics(): array
+    {
+        if ($this->lastAiFailures === []) {
+            return [
+                'summary' => 'No remote AI provider is configured, so this review used the local rubric.',
+                'attempts' => [],
+            ];
+        }
+
+        $attempts = collect($this->lastAiFailures)
+            ->map(function (array $failure) {
+                return [
+                    'provider' => (string) ($failure['provider'] ?? 'unknown'),
+                    'reason' => (string) ($failure['reason'] ?? 'unknown'),
+                    'message' => (string) ($failure['message'] ?? 'Unknown AI provider failure.'),
+                    'raw_excerpt' => $failure['raw_excerpt'] ?? null,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $firstFailure = $attempts[0];
+
+        return [
+            'summary' => sprintf(
+                'AI review fallback: %s failed with %s.',
+                strtoupper((string) $firstFailure['provider']),
+                str_replace('_', ' ', (string) $firstFailure['reason'])
+            ),
+            'attempts' => $attempts,
+        ];
+    }
+
+    protected function normalizeAiEvaluation(?array $decoded, string $provider, array $task, int $wordCount): ?array
+    {
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $decoded['score'] = round((float) ($decoded['score'] ?? 0), 2);
+        $decoded['provider'] = $provider;
+        $decoded['strengths'] = array_values(array_slice(array_filter($decoded['strengths'] ?? [], 'is_string'), 0, 4));
+        $decoded['improvements'] = array_values(array_slice(array_filter($decoded['improvements'] ?? [], 'is_string'), 0, 5));
+        $decoded['breakdown'] = collect($decoded['breakdown'] ?? [])
+            ->map(function ($row) {
+                return [
+                    'key' => (string) ($row['key'] ?? Str::slug((string) ($row['label'] ?? 'criterion'), '_')),
+                    'label' => (string) ($row['label'] ?? 'Criterion'),
+                    'score' => round((float) ($row['score'] ?? 0), 1),
+                    'max' => round((float) ($row['max'] ?? 25), 1),
+                    'feedback' => (string) ($row['feedback'] ?? ''),
+                ];
+            })
+            ->filter(fn (array $row) => $row['label'] !== '')
+            ->take(4)
+            ->values()
+            ->all();
+
+        if (($decoded['summary'] ?? '') === '' || count($decoded['breakdown']) !== 4) {
+            return null;
+        }
+
+        $decoded['word_range'] = [
+            'min' => $task['word_limit']['min'],
+            'max' => $task['word_limit']['max'],
+            'in_range' => $wordCount >= $task['word_limit']['min'] && $wordCount <= $task['word_limit']['max'],
+        ];
+
+        return $decoded;
+    }
+
+    protected function diagnoseAiPayloadFailure(array $payload, string $fallbackMessage): array
+    {
+        $providerMessage = trim((string) data_get($payload, 'error.message', ''));
+        if ($providerMessage !== '') {
+            return ['provider_error', $providerMessage, $this->summarizePayload($payload)];
+        }
+
+        return ['empty_response', $fallbackMessage, $this->summarizePayload($payload)];
+    }
+
+    protected function summarizePayload(array $payload): ?string
+    {
+        if ($payload === []) {
+            return null;
+        }
+
+        $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return $this->summarizeRawText($encoded ?: null);
+    }
+
+    protected function summarizeRawText(?string $text): ?string
+    {
+        if (! is_string($text) || trim($text) === '') {
+            return null;
+        }
+
+        return Str::limit(preg_replace('/\s+/', ' ', trim($text)) ?? trim($text), 240);
+    }
+
+    protected function storeRawAiResponse(string $provider, array $task, int $status, string $body): void
+    {
+        $path = storage_path('logs/writing-ai-raw.log');
+        $directory = dirname($path);
+
+        if (! File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $entry = [
+            'timestamp' => now()->toDateTimeString(),
+            'provider' => $provider,
+            'task_id' => $task['id'] ?? null,
+            'task_type' => $task['task_type'] ?? null,
+            'status' => $status,
+            'body' => $body,
+        ];
+
+        File::append($path, json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL);
+    }
+
+    protected function extractResponsesText(array $payload): ?string
+    {
+        $outputText = data_get($payload, 'output_text');
+        if (is_string($outputText) && trim($outputText) !== '') {
+            return $outputText;
+        }
+
+        $outputs = data_get($payload, 'output', []);
+        if (is_array($outputs)) {
+            foreach ($outputs as $output) {
+                $contentItems = data_get($output, 'content', []);
+                if (! is_array($contentItems)) {
+                    continue;
+                }
+
+                foreach ($contentItems as $item) {
+                    $text = data_get($item, 'text')
+                        ?? data_get($item, 'output_text')
+                        ?? data_get($item, 'content.0.text');
+
+                    if (is_string($text) && trim($text) !== '') {
+                        return $text;
+                    }
+                }
+            }
+        }
+
+        $messageText = data_get($payload, 'choices.0.message.content');
+        if (is_string($messageText) && trim($messageText) !== '') {
+            return $messageText;
+        }
+
+        if (is_array($messageText)) {
+            foreach ($messageText as $item) {
+                $text = data_get($item, 'text');
+                if (is_string($text) && trim($text) !== '') {
+                    return $text;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function resolveAiProvider(): ?string
+    {
+        if (filled(config('services.gemini.api_key'))) {
+            return 'gemini';
+        }
+
+        return null;
+    }
+
+    protected function resolveAiProviderLabel(): string
+    {
+        return match ($this->resolveAiProvider()) {
+            'gemini' => 'Gemini review ready',
+            default => 'Local rubric fallback',
+        };
+    }
+
+    protected function usesCompatibleGeminiApi(): bool
+    {
+        return ! str_contains((string) config('services.gemini.base_url'), 'generativelanguage.googleapis.com');
     }
 
     protected function formatStoredResult(Submission $submission): array
@@ -650,6 +950,7 @@ PROMPT;
             'suggested_revision' => $advice['suggested_revision'] ?? '',
             'word_range' => $advice['word_range'] ?? null,
             'metrics' => $advice['metrics'] ?? null,
+            'ai_diagnostics' => $advice['ai_diagnostics'] ?? null,
             'submitted_text' => (string) ($answer['text'] ?? ''),
             'word_count' => (int) ($answer['word_count'] ?? 0),
             'attempt_count' => (int) ($submission->attempt_count ?? 1),
