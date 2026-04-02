@@ -41,6 +41,23 @@ class SelectionTranslationTest extends TestCase
             ->assertJsonPath('translation.provider', 'langbly');
     }
 
+    public function test_translate_endpoint_returns_clear_message_for_selection_that_is_too_long(): void
+    {
+        $user = User::factory()->create();
+        $longText = str_repeat('a', 221);
+
+        $response = $this->actingAs($user)->post(route('selection.translate'), [
+            'text' => $longText,
+            'source_language' => 'en',
+            'target_language' => 'zh-CN',
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('message', 'Selected text is too long to translate at once. Please keep it within 220 characters.');
+    }
+
     public function test_save_endpoint_persists_selection_favorite(): void
     {
         $user = User::factory()->create();

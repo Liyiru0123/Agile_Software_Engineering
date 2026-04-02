@@ -12,6 +12,9 @@ use RuntimeException;
 
 class SelectionTranslationController extends Controller
 {
+    private const MAX_TRANSLATE_LENGTH = 220;
+    private const MAX_SAVE_LENGTH = 191;
+
     public function __construct(
         protected LangblyTranslationService $translationService,
         protected ArticleTextProcessor $processor
@@ -21,9 +24,12 @@ class SelectionTranslationController extends Controller
     public function translate(Request $request): JsonResponse
     {
         $payload = $request->validate([
-            'text' => ['required', 'string', 'min:1', 'max:220'],
+            'text' => ['required', 'string', 'min:1', 'max:' . self::MAX_TRANSLATE_LENGTH],
             'source_language' => ['sometimes', 'nullable', 'string', 'max:16'],
             'target_language' => ['sometimes', 'nullable', 'string', 'max:16'],
+        ], [
+            'text.max' => 'Selected text is too long to translate at once. Please keep it within '
+                . self::MAX_TRANSLATE_LENGTH . ' characters.',
         ]);
 
         try {
@@ -48,10 +54,13 @@ class SelectionTranslationController extends Controller
         $payload = $request->validate([
             'article_id' => ['required', 'integer', 'exists:articles,id'],
             'paragraph_index' => ['required', 'integer', 'min:0'],
-            'selected_text' => ['required', 'string', 'min:1', 'max:191'],
+            'selected_text' => ['required', 'string', 'min:1', 'max:' . self::MAX_SAVE_LENGTH],
             'translated_text' => ['sometimes', 'nullable', 'string'],
             'source_language' => ['sometimes', 'nullable', 'string', 'max:16'],
             'target_language' => ['sometimes', 'nullable', 'string', 'max:16'],
+        ], [
+            'selected_text.max' => 'Selected text is too long to save. Please keep it within '
+                . self::MAX_SAVE_LENGTH . ' characters.',
         ]);
 
         $article = Article::query()->findOrFail($payload['article_id']);

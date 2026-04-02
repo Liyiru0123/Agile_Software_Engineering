@@ -99,6 +99,7 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const translateUrl = @json(route('selection.translate'));
         const saveUrl = @json(route('selection.save'));
+        const maxTranslateCharacters = 220;
         const state = {
             text: '',
             rect: null,
@@ -149,10 +150,15 @@
             state.translatedText = '';
 
             selectedEl.textContent = text;
-            resultEl.textContent = text.length > 220
-                ? 'Select a shorter passage to translate. The current limit is 220 characters.'
+            resultEl.textContent = text.length > maxTranslateCharacters
+                ? `Selected text: ${text.length} characters. Limit: ${maxTranslateCharacters}.`
                 : 'Select text, then click Translate.';
-            setStatus('', 'info');
+            setStatus(
+                text.length > maxTranslateCharacters
+                    ? `This selection is too long to translate at once. Please shorten it by ${text.length - maxTranslateCharacters} characters.`
+                    : '',
+                'error'
+            );
             updateSaveAvailability();
             showPopover();
         }
@@ -270,7 +276,11 @@
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                throw new Error(data.message || 'Request failed.');
+                const validationErrors = data.errors
+                    ? Object.values(data.errors).flat().join(' ')
+                    : '';
+
+                throw new Error(validationErrors || data.message || 'Request failed.');
             }
 
             return data;
@@ -281,8 +291,12 @@
                 return;
             }
 
-            if (state.text.length > 220) {
-                setStatus('Select a shorter passage before translating.', 'error');
+            if (state.text.length > maxTranslateCharacters) {
+                resultEl.textContent = `Selected text: ${state.text.length} characters. Limit: ${maxTranslateCharacters}.`;
+                setStatus(
+                    `This selection is too long to translate at once. Please shorten it by ${state.text.length - maxTranslateCharacters} characters.`,
+                    'error'
+                );
                 return;
             }
 
