@@ -114,7 +114,9 @@ class SelectionTranslationController extends Controller
                 'article_id' => $favorite->article_id,
                 'provider' => $favorite->provider,
             ],
-            'message' => $favorite->wasRecentlyCreated ? 'Saved to favorites.' : 'Already saved. The translation has been refreshed.',
+            'message' => $favorite->wasRecentlyCreated
+                ? 'Saved to favorites.'
+                : 'Already saved. The translation has been refreshed.',
         ]);
     }
 }

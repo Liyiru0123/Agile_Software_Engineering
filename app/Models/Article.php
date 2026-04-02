@@ -22,5 +22,12 @@ class Article extends Model
         return $this->hasMany(UserFavorite::class);
     }
 
+    // app/Models/Article.php （补充关系方法）
+    //这里也改名为readingQuestions（），ai给的是questions
+    public function readingQuestions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ReadingQuestion::class);
+    }
+
     public $timestamps = false;
 }

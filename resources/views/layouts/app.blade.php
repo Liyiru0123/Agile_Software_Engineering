@@ -56,217 +56,204 @@
 
     @yield('content')
 
-    <div id="selection-translation-panel" class="hidden fixed z-[70] w-[360px] max-w-[calc(100vw-2rem)] rounded-[1.75rem] border border-[#E0D2C2] bg-white p-5 selection-panel-shadow">
-        <div class="flex items-start justify-between gap-3 mb-4">
-            <div>
-                <div class="text-xs uppercase tracking-[0.16em] text-[#9A7358] font-semibold">Quick Actions</div>
-                <div class="text-lg font-bold text-[#4A2C2A] mt-1">Selected Text</div>
+    <div id="selection-translate-popover" class="hidden fixed z-[70] w-[min(24rem,calc(100vw-1.5rem))] rounded-3xl border border-[#E0D2C2] bg-white shadow-2xl shadow-[#2C1810]/15">
+        <div class="px-4 pt-4 pb-3 border-b border-[#F0E4D7]">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <div class="text-[11px] uppercase tracking-[0.16em] text-[#9A7358] font-semibold">Selection</div>
+                    <div id="selection-translate-selected" class="mt-2 text-sm leading-6 text-[#3A2A22]"></div>
+                </div>
+                <div id="selection-translate-save-hint" class="hidden text-[11px] leading-5 text-[#9A7358] max-w-[8rem] text-right"></div>
             </div>
-            <button id="selection-panel-close" type="button" class="rounded-full border border-[#E8D9C9] px-3 py-1 text-sm text-[#6B3D2E] hover:bg-[#F8F1E7]">
-                Close
-            </button>
         </div>
 
-        <div id="selection-source-text" class="rounded-2xl bg-[#FBF7F1] border border-[#EEE2D4] px-4 py-3 text-sm leading-6 text-[#3A2A22] mb-4"></div>
+        <div class="px-4 py-3 space-y-3">
+            <div id="selection-translate-status" class="hidden rounded-2xl px-3 py-2 text-sm"></div>
+            <div id="selection-translate-result" class="rounded-2xl bg-[#FBF7F1] border border-[#EEE2D4] px-3 py-3 text-sm leading-6 text-[#3A2A22]">
+                Select text, then click Translate.
+            </div>
+        </div>
 
-        <div class="flex gap-3 mb-4">
-            <button id="selection-translate-btn" type="button" class="flex-1 rounded-2xl bg-[#6B3D2E] text-white px-4 py-3 font-semibold hover:bg-[#4A2C2A] transition">
+        <div class="px-4 pb-4 flex items-center gap-3">
+            <button id="selection-translate-action" type="button" class="flex-1 rounded-2xl bg-[#6B3D2E] hover:bg-[#4A2C2A] text-white px-4 py-3 text-sm font-semibold transition">
                 Translate
             </button>
-            <button id="selection-save-btn" type="button" class="flex-1 rounded-2xl border border-[#D9C7B5] text-[#6B3D2E] px-4 py-3 font-semibold hover:bg-[#F8F1E7] transition disabled:cursor-not-allowed disabled:opacity-60">
+            <button id="selection-save-action" type="button" class="flex-1 rounded-2xl border border-[#D9C7B5] text-[#4A2C2A] px-4 py-3 text-sm font-semibold transition hover:bg-[#FBF7F1] disabled:opacity-50 disabled:cursor-not-allowed">
                 Save
             </button>
-        </div>
-
-        <div id="selection-status" class="hidden rounded-2xl px-4 py-3 text-sm mb-4"></div>
-
-        <div id="selection-translation-result" class="hidden rounded-2xl bg-[#F5EEE6] border border-[#E0D2C2] px-4 py-3">
-            <div class="text-xs uppercase tracking-[0.15em] text-[#9A7358] font-semibold mb-2">Translation</div>
-            <div id="selection-translation-text" class="text-sm leading-6 text-[#3A2A22]"></div>
         </div>
     </div>
 
     @stack('scripts')
 
+    @auth
     <script>
     (() => {
-        const panel = document.getElementById('selection-translation-panel');
-        const closeBtn = document.getElementById('selection-panel-close');
-        const translateBtn = document.getElementById('selection-translate-btn');
-        const saveBtn = document.getElementById('selection-save-btn');
-        const sourceTextEl = document.getElementById('selection-source-text');
-        const statusEl = document.getElementById('selection-status');
-        const translationResultEl = document.getElementById('selection-translation-result');
-        const translationTextEl = document.getElementById('selection-translation-text');
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const popover = document.getElementById('selection-translate-popover');
+        const selectedEl = document.getElementById('selection-translate-selected');
+        const resultEl = document.getElementById('selection-translate-result');
+        const statusEl = document.getElementById('selection-translate-status');
+        const saveHintEl = document.getElementById('selection-translate-save-hint');
+        const translateButton = document.getElementById('selection-translate-action');
+        const saveButton = document.getElementById('selection-save-action');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const translateUrl = @json(route('selection.translate'));
         const saveUrl = @json(route('selection.save'));
+        const state = {
+            text: '',
+            rect: null,
+            articleId: null,
+            paragraphIndex: null,
+            sourceLanguage: 'en',
+            targetLanguage: 'zh-CN',
+            translatedText: '',
+        };
 
-        let activeSelection = null;
+        let selectionTimeout = null;
 
-        function normalizeText(value) {
-            return String(value || '').replace(/\s+/g, ' ').trim();
+        function queueSelectionUpdate() {
+            window.clearTimeout(selectionTimeout);
+            selectionTimeout = window.setTimeout(updateFromSelection, 0);
         }
 
-        function getElementFromNode(node) {
-            if (!node) {
+        function updateFromSelection() {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                hidePopover();
+                return;
+            }
+
+            const text = selection.toString().replace(/\s+/g, ' ').trim();
+            if (!text) {
+                hidePopover();
+                return;
+            }
+
+            const anchorMeta = getParagraphMeta(selection.anchorNode);
+            const focusMeta = getParagraphMeta(selection.focusNode);
+            const paragraphMeta = isSameParagraph(anchorMeta, focusMeta) ? anchorMeta : null;
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            if (!rect || (!rect.width && !rect.height)) {
+                hidePopover();
+                return;
+            }
+
+            state.text = text;
+            state.rect = rect;
+            state.articleId = paragraphMeta?.articleId ?? null;
+            state.paragraphIndex = paragraphMeta?.paragraphIndex ?? null;
+            state.sourceLanguage = paragraphMeta?.sourceLanguage ?? 'en';
+            state.targetLanguage = paragraphMeta?.targetLanguage ?? 'zh-CN';
+            state.translatedText = '';
+
+            selectedEl.textContent = text;
+            resultEl.textContent = text.length > 220
+                ? 'Select a shorter passage to translate. The current limit is 220 characters.'
+                : 'Select text, then click Translate.';
+            setStatus('', 'info');
+            updateSaveAvailability();
+            showPopover();
+        }
+
+        function updateSaveAvailability() {
+            if (state.articleId !== null && state.paragraphIndex !== null) {
+                saveButton.disabled = false;
+                saveHintEl.classList.add('hidden');
+                saveHintEl.textContent = '';
+                return;
+            }
+
+            saveButton.disabled = true;
+            saveHintEl.textContent = 'Save works inside article paragraphs.';
+            saveHintEl.classList.remove('hidden');
+        }
+
+        function getParagraphMeta(node) {
+            const element = node instanceof Element ? node : node?.parentElement;
+            const paragraph = element?.closest('[data-paragraph-index]');
+            if (!paragraph) {
                 return null;
             }
 
-            return node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-        }
+            const scope = paragraph.closest('[data-translate-scope]');
 
-        function isIgnoredElement(element) {
-            return Boolean(element?.closest('input, textarea, select, option, audio, video, script, style, #selection-translation-panel'));
-        }
-
-        function hidePanel() {
-            panel.classList.add('hidden');
-            panel.style.top = '';
-            panel.style.left = '';
-            activeSelection = null;
-            clearStatus();
-            hideTranslation();
-        }
-
-        function showPanel(selection) {
-            sourceTextEl.textContent = selection.text;
-            panel.classList.remove('hidden');
-            positionPanel(selection.rect);
-            updateSaveState(selection.canSave, false);
-            clearStatus();
-
-            if (selection.translatedText) {
-                showTranslation(selection.translatedText);
-            } else {
-                hideTranslation();
-            }
-        }
-
-        function showStatus(message, tone = 'neutral') {
-            const tones = {
-                neutral: 'bg-[#F5EEE6] text-[#6B3D2E] border border-[#E0D2C2]',
-                success: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
-                error: 'bg-red-50 text-red-800 border border-red-200',
-                warning: 'bg-amber-50 text-amber-800 border border-amber-200',
+            return {
+                articleId: Number(paragraph.dataset.articleId || scope?.dataset.articleId || 0) || null,
+                paragraphIndex: Number(paragraph.dataset.paragraphIndex || -1),
+                sourceLanguage: scope?.dataset.sourceLanguage || 'en',
+                targetLanguage: scope?.dataset.targetLanguage || 'zh-CN',
             };
-
-            statusEl.className = `rounded-2xl px-4 py-3 text-sm mb-4 ${tones[tone] || tones.neutral}`;
-            statusEl.textContent = message;
-            statusEl.classList.remove('hidden');
         }
 
-        function clearStatus() {
-            statusEl.classList.add('hidden');
-            statusEl.textContent = '';
-        }
-
-        function showTranslation(text) {
-            translationTextEl.textContent = text;
-            translationResultEl.classList.remove('hidden');
-        }
-
-        function hideTranslation() {
-            translationResultEl.classList.add('hidden');
-            translationTextEl.textContent = '';
-        }
-
-        function updateSaveState(canSave, saved) {
-            saveBtn.disabled = !canSave || saved;
-            saveBtn.textContent = saved ? 'Saved' : 'Save';
-            if (!canSave) {
-                saveBtn.textContent = 'Save unavailable';
+        function isSameParagraph(first, second) {
+            if (!first || !second) {
+                return false;
             }
+
+            return first.articleId === second.articleId && first.paragraphIndex === second.paragraphIndex;
         }
 
-        function positionPanel(rect) {
-            if (!rect) {
-                panel.style.top = '6rem';
-                panel.style.left = `${Math.max(16, window.innerWidth - panel.offsetWidth - 24)}px`;
+        function showPopover() {
+            popover.classList.remove('hidden');
+            positionPopover();
+        }
+
+        function hidePopover() {
+            popover.classList.add('hidden');
+        }
+
+        function positionPopover() {
+            if (popover.classList.contains('hidden') || !state.rect) {
                 return;
             }
 
             const gap = 12;
-            const margin = 16;
-            const panelWidth = panel.offsetWidth || 360;
-            const panelHeight = panel.offsetHeight || 260;
+            const rect = state.rect;
+            const width = popover.offsetWidth;
+            const height = popover.offsetHeight;
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
 
             let left = rect.right + gap;
-            let top = rect.top + Math.min(rect.height + gap, 24);
+            let top = rect.bottom + gap;
 
-            if (left + panelWidth > viewportWidth - margin) {
-                left = rect.left - panelWidth - gap;
+            if (left + width > viewportWidth - 12) {
+                left = rect.left - width - gap;
             }
 
-            if (left < margin) {
-                left = Math.min(
-                    Math.max(margin, rect.left),
-                    Math.max(margin, viewportWidth - panelWidth - margin)
-                );
+            if (left < 12) {
+                left = Math.max(12, viewportWidth - width - 12);
             }
 
-            if (top + panelHeight > viewportHeight - margin) {
-                top = rect.top - panelHeight - gap;
+            if (top + height > viewportHeight - 12) {
+                top = rect.top - height - gap;
             }
 
-            if (top < margin) {
-                top = Math.min(
-                    Math.max(margin, rect.bottom + gap),
-                    Math.max(margin, viewportHeight - panelHeight - margin)
-                );
+            if (top < 12) {
+                top = 12;
             }
 
-            panel.style.left = `${Math.max(margin, left)}px`;
-            panel.style.top = `${Math.max(margin, top)}px`;
+            popover.style.left = `${left}px`;
+            popover.style.top = `${top}px`;
         }
 
-        function collectSelectionState() {
-            const selection = window.getSelection();
-
-            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-                return null;
+        function setStatus(message, kind) {
+            if (!message) {
+                statusEl.className = 'hidden rounded-2xl px-3 py-2 text-sm';
+                statusEl.textContent = '';
+                return;
             }
 
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-
-            const text = normalizeText(selection.toString());
-
-            if (!text || text.length > 220) {
-                return null;
-            }
-
-            const anchorEl = getElementFromNode(selection.anchorNode);
-            const focusEl = getElementFromNode(selection.focusNode);
-
-            if (!anchorEl || isIgnoredElement(anchorEl)) {
-                return null;
-            }
-
-            const scope = anchorEl.closest('[data-translate-scope="true"]') || document.body;
-            const focusScope = focusEl?.closest?.('[data-translate-scope="true"]') || document.body;
-
-            if (!scope || (focusScope && focusScope !== scope)) {
-                return null;
-            }
-
-            const paragraphEl = anchorEl.closest('[data-paragraph-index]') || focusEl?.closest?.('[data-paragraph-index]') || null;
-            const articleId = scope.dataset.articleId || paragraphEl?.dataset.articleId || null;
-            const paragraphIndex = paragraphEl?.dataset.paragraphIndex ?? null;
-
-            return {
-                text,
-                articleId,
-                paragraphIndex,
-                paragraphText: normalizeText(paragraphEl?.innerText || ''),
-                sourceLanguage: scope.dataset.sourceLanguage || 'en',
-                targetLanguage: scope.dataset.targetLanguage || 'zh-CN',
-                translatedText: '',
-                canSave: Boolean(articleId && paragraphIndex !== null),
-                rect: rect.width > 0 || rect.height > 0 ? rect : null,
+            const classes = {
+                info: 'rounded-2xl px-3 py-2 text-sm bg-[#F8F1E7] text-[#6B3D2E] border border-[#E8D9C9]',
+                success: 'rounded-2xl px-3 py-2 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200',
+                error: 'rounded-2xl px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200',
             };
+
+            statusEl.className = classes[kind] || classes.info;
+            statusEl.textContent = message;
         }
 
         async function postJson(url, payload) {
@@ -274,8 +261,8 @@
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': csrfToken,
-                    'Content-Type': 'application/json',
                     'Accept': 'application/json',
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
             });
@@ -289,126 +276,104 @@
             return data;
         }
 
-        function handleSelectionChange() {
-            const selectionState = collectSelectionState();
-
-            if (!selectionState) {
+        translateButton.addEventListener('click', async () => {
+            if (!state.text) {
                 return;
             }
 
-            activeSelection = selectionState;
-            showPanel(activeSelection);
-        }
-
-        document.addEventListener('mouseup', () => setTimeout(handleSelectionChange, 0));
-        document.addEventListener('keyup', (event) => {
-            if (event.key === 'Shift' || event.key.startsWith('Arrow')) {
-                setTimeout(handleSelectionChange, 0);
-            }
-        });
-        document.addEventListener('mousedown', (event) => {
-            if (panel.classList.contains('hidden')) {
+            if (state.text.length > 220) {
+                setStatus('Select a shorter passage before translating.', 'error');
                 return;
             }
 
-            if (panel.contains(event.target)) {
-                return;
-            }
-
-            window.getSelection()?.removeAllRanges();
-            hidePanel();
-        });
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                window.getSelection()?.removeAllRanges();
-                hidePanel();
-            }
-        });
-        window.addEventListener('resize', () => {
-            if (activeSelection && !panel.classList.contains('hidden')) {
-                positionPanel(activeSelection.rect);
-            }
-        });
-        window.addEventListener('scroll', () => {
-            if (activeSelection && !panel.classList.contains('hidden')) {
-                const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-                    const rect = selection.getRangeAt(0).getBoundingClientRect();
-                    activeSelection.rect = rect.width > 0 || rect.height > 0 ? rect : activeSelection.rect;
-                }
-
-                positionPanel(activeSelection.rect);
-            }
-        }, true);
-
-        closeBtn.addEventListener('click', () => {
-            window.getSelection()?.removeAllRanges();
-            hidePanel();
-        });
-
-        translateBtn.addEventListener('click', async () => {
-            if (!activeSelection) {
-                return;
-            }
-
-            translateBtn.disabled = true;
-            translateBtn.textContent = 'Translating...';
-            clearStatus();
+            translateButton.disabled = true;
+            translateButton.textContent = 'Translating...';
+            setStatus('', 'info');
 
             try {
                 const data = await postJson(translateUrl, {
-                    text: activeSelection.text,
-                    source_language: activeSelection.sourceLanguage,
-                    target_language: activeSelection.targetLanguage,
+                    text: state.text,
+                    source_language: state.sourceLanguage,
+                    target_language: state.targetLanguage,
                 });
 
-                activeSelection.translatedText = data.translation.translated_text;
-                activeSelection.sourceLanguage = data.translation.source_language || activeSelection.sourceLanguage;
-                activeSelection.targetLanguage = data.translation.target_language || activeSelection.targetLanguage;
-                showTranslation(activeSelection.translatedText);
-                showStatus('Translation loaded.', 'success');
+                state.translatedText = data.translation?.translated_text || '';
+                resultEl.textContent = state.translatedText || 'No translation returned.';
+                setStatus('Translation ready.', 'success');
+                positionPopover();
             } catch (error) {
-                showStatus(error.message || 'Unable to translate the selected text right now.', 'error');
+                setStatus(error.message, 'error');
             } finally {
-                translateBtn.disabled = false;
-                translateBtn.textContent = 'Translate';
+                translateButton.disabled = false;
+                translateButton.textContent = 'Translate';
             }
         });
 
-        saveBtn.addEventListener('click', async () => {
-            if (!activeSelection) {
+        saveButton.addEventListener('click', async () => {
+            if (saveButton.disabled || !state.text || state.articleId === null || state.paragraphIndex === null) {
                 return;
             }
 
-            if (!activeSelection.canSave) {
-                showStatus('Save is only available for selections inside article paragraphs.', 'warning');
-                return;
-            }
-
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
-            clearStatus();
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+            setStatus('', 'info');
 
             try {
                 const data = await postJson(saveUrl, {
-                    article_id: Number(activeSelection.articleId),
-                    paragraph_index: Number(activeSelection.paragraphIndex),
-                    selected_text: activeSelection.text,
-                    translated_text: activeSelection.translatedText || null,
-                    source_language: activeSelection.sourceLanguage,
-                    target_language: activeSelection.targetLanguage,
+                    article_id: state.articleId,
+                    paragraph_index: state.paragraphIndex,
+                    selected_text: state.text,
+                    translated_text: state.translatedText,
+                    source_language: state.sourceLanguage,
+                    target_language: state.targetLanguage,
                 });
 
-                activeSelection.translatedText = data.favorite.translated_text;
-                showTranslation(activeSelection.translatedText);
-                updateSaveState(true, true);
-                showStatus(data.message || 'Saved to favorites.', 'success');
+                if (data.favorite?.translated_text && !state.translatedText) {
+                    state.translatedText = data.favorite.translated_text;
+                    resultEl.textContent = state.translatedText;
+                }
+
+                setStatus(data.message || 'Saved to favorites.', 'success');
+                positionPopover();
             } catch (error) {
-                updateSaveState(true, false);
-                showStatus(error.message || 'Unable to save the selection right now.', 'error');
+                setStatus(error.message, 'error');
+            } finally {
+                saveButton.textContent = 'Save';
+                updateSaveAvailability();
             }
         });
+
+        document.addEventListener('mouseup', queueSelectionUpdate);
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'Escape') {
+                hidePopover();
+                return;
+            }
+
+            queueSelectionUpdate();
+        });
+        document.addEventListener('touchend', queueSelectionUpdate);
+        document.addEventListener('selectionchange', () => {
+            const selection = window.getSelection();
+            if (!selection || selection.toString().trim() === '') {
+                hidePopover();
+            }
+        });
+        document.addEventListener('mousedown', (event) => {
+            if (popover.classList.contains('hidden')) {
+                return;
+            }
+
+            if (popover.contains(event.target)) {
+                return;
+            }
+
+            hidePopover();
+        });
+        window.addEventListener('scroll', positionPopover, true);
+        window.addEventListener('resize', positionPopover);
     })();
     </script>
+    @endauth
 </body>
 </html>

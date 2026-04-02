@@ -36,7 +36,7 @@ class LangblyTranslationService
                     'X-API-Key' => $apiKey,
                     'Accept' => 'application/json',
                 ])
-                ->post(config('services.langbly.base_url'), $payload)
+                ->post((string) config('services.langbly.base_url'), $payload)
                 ->throw();
         } catch (RequestException $exception) {
             throw new RuntimeException('Langbly translation request failed.', 0, $exception);
@@ -50,7 +50,11 @@ class LangblyTranslationService
 
         return [
             'translated_text' => trim($translation),
-            'source_language' => data_get($response->json(), 'data.translations.0.detectedSourceLanguage', $sourceLanguage),
+            'source_language' => data_get(
+                $response->json(),
+                'data.translations.0.detectedSourceLanguage',
+                $sourceLanguage
+            ),
             'target_language' => $targetLanguage,
             'provider' => 'langbly',
         ];

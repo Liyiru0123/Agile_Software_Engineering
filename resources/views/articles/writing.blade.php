@@ -19,8 +19,8 @@
                     <div class="flex flex-wrap items-center gap-3 mb-4">
                         <span class="px-3 py-1 rounded-full bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs font-semibold">{{ $difficultyLabel }}</span>
                         <span class="px-3 py-1 rounded-full bg-[#C9A961]/15 text-[#6B3D2E] text-xs font-semibold">{{ number_format($article->word_count) }} words</span>
-                        <span class="px-3 py-1 rounded-full {{ $geminiReady ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F3E7D8] text-[#6B3D2E]' }} text-xs font-semibold">
-                            {{ $geminiReady ? 'Gemini review ready' : 'Local rubric fallback' }}
+                        <span class="px-3 py-1 rounded-full {{ $aiReady ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F3E7D8] text-[#6B3D2E]' }} text-xs font-semibold">
+                            {{ $aiProviderLabel }}
                         </span>
                         <span class="px-3 py-1 rounded-full bg-[#4A2C2A]/10 text-[#4A2C2A] text-xs font-semibold">
                             {{ count($writingTasks) }} writing tasks
@@ -29,7 +29,7 @@
 
                     <h1 class="text-3xl font-bold text-[#4A2C2A] mb-3">{{ $article->title }}</h1>
                     <p class="text-[#6B3D2E] leading-7 mb-6">
-                        This writing hub now uses the project database structure directly: each task comes from `exercises`, each review is stored in `submissions`, and AI review uses the `writing` prompt configuration when Gemini is available.
+                        This writing hub now uses the project database structure directly: each task comes from `exercises`, each review is stored in `submissions`, and AI review uses the `writing` prompt configuration when a remote AI provider is available.
                     </p>
 
                     <div class="grid md:grid-cols-3 gap-4" id="task-switcher">
@@ -137,6 +137,8 @@
 
                     <p id="result-summary" class="text-[#F8EEDD] leading-7 mb-6"></p>
 
+                    <div id="result-ai-diagnostics" class="hidden rounded-3xl border border-amber-200/40 bg-amber-50/10 px-5 py-4 text-sm text-[#F8EEDD] leading-6 mb-6"></div>
+
                     <div class="grid md:grid-cols-2 gap-4 mb-6" id="result-breakdown"></div>
 
                     <div class="grid md:grid-cols-2 gap-6 mb-6">
@@ -190,10 +192,10 @@
                 <div class="bg-[#4A2C2A] text-white rounded-[2rem] p-6 shadow-lg">
                     <h3 class="text-2xl font-bold mb-3">Implementation Notes</h3>
                     <p class="text-sm text-[#F5E6D3]/85 leading-6 mb-4">
-                        `writing` now supports multiple task types, server-side evaluation, and persistent submission records. If Gemini is unavailable, the page falls back to a local academic-writing rubric so the feature still works offline.
+                        `writing` now supports multiple task types, server-side evaluation, and persistent submission records. If the remote AI provider is unavailable, the page falls back to a local academic-writing rubric so the feature still works offline.
                     </p>
                     <div class="text-sm text-[#D7BE8A] leading-6">
-                        Current mode: {{ $geminiReady ? 'AI review + database persistence' : 'Local rubric + database persistence' }}
+                        Current mode: {{ $aiReady ? 'AI review + database persistence' : 'Local rubric + database persistence' }}
                     </div>
                 </div>
             </aside>
@@ -221,6 +223,7 @@ const submitBtn = document.getElementById('submit-writing-draft');
 const saveBtn = document.getElementById('save-writing-draft');
 const clearBtn = document.getElementById('clear-writing-draft');
 const resultPanel = document.getElementById('writing-result-panel');
+const diagnosticsEl = document.getElementById('result-ai-diagnostics');
 
 taskButtons.forEach((button) => {
     button.addEventListener('click', () => renderTask(Number(button.dataset.taskIndex)));
@@ -345,6 +348,7 @@ function renderResult(result) {
     }
     document.getElementById('result-meta').textContent = meta.join(' - ');
     document.getElementById('result-summary').textContent = result.summary || 'Feedback saved.';
+    renderDiagnostics(result);
 
     const range = result.word_range;
     document.getElementById('result-word-range').textContent = range
@@ -364,6 +368,27 @@ function renderResult(result) {
     renderTextList('result-strengths', result.strengths || []);
     renderTextList('result-improvements', result.improvements || []);
     document.getElementById('result-revision').textContent = result.suggested_revision || 'No revision advice provided yet.';
+}
+
+function renderDiagnostics(result) {
+    const summary = result.ai_diagnostics?.summary || '';
+    const attempts = result.ai_diagnostics?.attempts || [];
+
+    if (!summary) {
+        diagnosticsEl.classList.add('hidden');
+        diagnosticsEl.textContent = '';
+        return;
+    }
+
+    const details = attempts
+        .map((attempt) => {
+            const excerpt = attempt.raw_excerpt ? ` Raw: ${attempt.raw_excerpt}` : '';
+            return `${attempt.provider}: ${attempt.message}${excerpt}`;
+        })
+        .join(' | ');
+
+    diagnosticsEl.classList.remove('hidden');
+    diagnosticsEl.textContent = details ? `${summary} ${details}` : summary;
 }
 
 function prependRecentAttempt(result) {
