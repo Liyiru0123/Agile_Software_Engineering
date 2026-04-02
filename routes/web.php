@@ -179,7 +179,7 @@ Route::get('/articles', function (Request $request) {
             break;
     }
 
-    $articles = $query->paginate(10);
+    $articles = $query->paginate(12);
     $favoritedArticleIds = DB::table('user_favorites')
         ->where('user_id', auth()->id())
         ->pluck('article_id')
