@@ -6,7 +6,7 @@
 <div class="min-h-screen bg-[#F6F0E8] py-8">
     <div class="max-w-6xl mx-auto px-4 md:px-6">
         <a href="{{ route('articles.show', $article) }}" class="inline-flex items-center text-sm text-[#6B3D2E] hover:text-[#4A2C2A] mb-6">
-            �?Back to Article
+            â†?Back to Article
         </a>
 
         <div class="grid lg:grid-cols-[minmax(0,1.35fr)_360px] gap-6 items-start">

@@ -7,6 +7,11 @@
 
     <title>@yield('title', 'Academic English')</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .selection-panel-shadow {
+            box-shadow: 0 22px 45px rgba(74, 44, 42, 0.16);
+        }
+    </style>
     @stack('styles')
 </head>
 <body class="bg-[#FAF0E6]">

@@ -88,7 +88,7 @@
                             <div class="text-xs uppercase tracking-[0.15em] text-[#6B3D2E] font-semibold">Source Excerpt</div>
                             <div class="text-xs text-[#9A7358]">Use the article ideas, but write in your own words.</div>
                         </div>
-                        <div id="current-source-text" class="text-[#3A2A22] leading-7">{{ $initialTask['source_text'] ?? '' }}</div>
+                        <div id="current-source-text" class="text-[#3A2A22] leading-7" data-translate-scope="true" data-article-id="{{ $article->id }}" data-source-language="en" data-target-language="zh-CN">{{ $initialTask['source_text'] ?? '' }}</div>
                     </div>
 
                     <label for="writing-draft" class="block text-sm font-semibold text-[#4A2C2A] mb-3">Your Draft</label>
@@ -461,3 +461,4 @@ function escapeHtml(value) {
 }
 </script>
 @endpush
+
