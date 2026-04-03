@@ -11,9 +11,22 @@
         .selection-panel-shadow {
             box-shadow: 0 22px 45px rgba(74, 44, 42, 0.16);
         }
+
+        .companion-bubble-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
     </style>
     @stack('styles')
 </head>
+@php
+    $companionProfile = auth()->check()
+        ? \App\Models\CompanionProfile::query()->with('equippedItem')->where('user_id', auth()->id())->first()
+        : null;
+    $companionGold = $companionProfile?->gold ?? 0;
+    $companionEquipped = $companionProfile?->equippedItem?->name;
+    $companionNotice = session('companion_notice');
+@endphp
 <body class="bg-[#FAF0E6]">
     <nav class="bg-[#4A2C2A] border-b-4 border-[#2C1810] shadow-xl sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -37,11 +50,19 @@
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('articles.*') ? 'bg-[#6B3D2E]' : '' }}">
                         Library
                     </a>
+                    <a href="{{ route('companion.index') }}"
+                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('companion.*') ? 'bg-[#6B3D2E]' : '' }}">
+                        Companion
+                    </a>
                 </div>
             </div>
 
             @auth
                 <div class="flex items-center gap-4">
+                    <a href="{{ route('companion.index') }}" class="hidden sm:inline-flex items-center gap-2 rounded-full border border-[#C9A961]/50 bg-[#F5E6D3]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#F5E6D3] hover:bg-[#F5E6D3]/15 transition">
+                        <span>Gold</span>
+                        <span class="text-[#D4B970]">{{ number_format($companionGold) }}</span>
+                    </a>
                     <span class="text-[#F5E6D3] text-sm font-medium">{{ auth()->user()->name }}</span>
                     <form method="POST" action="{{ route('logout') }}" class="inline">
                         @csrf
@@ -84,6 +105,27 @@
         </div>
     </div>
 
+    <div id="companion-shell" class="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3">
+        <button id="companion-reopen" type="button" class="hidden rounded-full border border-[#D9C7B5] bg-white/95 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#4A2C2A] shadow-lg hover:bg-[#FBF7F1] transition">
+            Open Hiyori
+        </button>
+
+        <div id="companion-widget" class="w-[220px] sm:w-[260px] pointer-events-auto">
+            <div id="companion-bubble" class="mb-3 rounded-3xl border border-[#E7D4C3] bg-white/95 px-4 py-3 text-sm leading-6 text-[#4A2C2A] shadow-xl opacity-0 translate-y-2 transition duration-300"></div>
+            <div id="companion-stage" class="relative h-[340px] cursor-pointer select-none overflow-visible bg-transparent">
+                <button id="companion-hitbox" type="button" aria-label="Talk to Hiyori" class="absolute inset-0 z-10 bg-transparent"></button>
+                <div id="companion-stage-fallback" class="absolute inset-x-0 bottom-10 text-center text-sm text-[#6B3D2E]">
+                    Loading Hiyori v2...
+                </div>
+            </div>
+        </div>
+
+        <div id="companion-menu" class="hidden fixed z-[65] min-w-[180px] rounded-2xl border border-[#D9C7B5] bg-white py-2 shadow-2xl shadow-[#2C1810]/20">
+            <button id="companion-hide-action" type="button" class="w-full px-4 py-2.5 text-left text-sm font-medium text-[#4A2C2A] hover:bg-[#FBF7F1] transition">
+                Hide Hiyori
+            </button>
+        </div>
+    </div>
     @stack('scripts')
 
     @auth
@@ -389,5 +431,311 @@
     })();
     </script>
     @endauth
+    <script>
+    (() => {
+        const widget = document.getElementById('companion-widget');
+        const reopenButton = document.getElementById('companion-reopen');
+        const bubble = document.getElementById('companion-bubble');
+        const stage = document.getElementById('companion-stage');
+        const hitbox = document.getElementById('companion-hitbox');
+        const stageFallback = document.getElementById('companion-stage-fallback');
+        const menu = document.getElementById('companion-menu');
+        const hideAction = document.getElementById('companion-hide-action');
+        const hiddenStorageKey = 'eaplus:hiyori:hidden';
+        const runtimeVersion = 'hiyori-runtime-v3';
+        const modelUrl = @json(asset('live2d/hiyori/hiyori_free_t08.model3.json'));
+        const initialNotice = @json($companionNotice['message'] ?? null);
+        const goldBalance = @json($companionGold);
+        const equippedName = @json($companionEquipped);
+        const authenticated = @json(auth()->check());
+        const clickLines = [
+            'Hello. Ready for one focused study set?',
+            'A short session still counts. Let us keep the streak moving.',
+            'You clicked me. I will assume that means we are working now.',
+            'Pick one article and finish one module. Momentum first.',
+            'If you only have ten minutes, use them well.',
+            'One finished task is better than five half-started ones.',
+            'Let us keep going. I am paying attention.',
+        ];
+        const factLines = [
+            'Fun fact: repeating short listening clips is usually more effective than replaying a long one passively.',
+            'Fun fact: saving one strong sentence to your notebook is often better than saving ten vague ones.',
+            'Fun fact: paraphrasing after reading improves recall much more than rereading alone.',
+            'Fun fact: a stable daily routine beats occasional marathon sessions.',
+        ];
+        const idleLines = [
+            'I am staying here in the corner while you study.',
+            'Right click me if you want to hide the widget for now.',
+            'Click me for a short line or a study fact.',
+        ];
+        const authLines = authenticated
+            ? [
+                `Current gold: ${goldBalance}.`,
+                equippedName ? `Equipped outfit: ${equippedName}.` : 'Current outfit: Default Look.',
+                'Finish one module in an article to earn more gold.',
+            ]
+            : ['Log in to start collecting gold for Hiyori.'];
+
+        let bubbleTimer = null;
+        let live2dLoaded = false;
+        let live2dApp = null;
+        let live2dModel = null;
+        let lastSpeechTriggerAt = 0;
+
+        function randomFrom(list) {
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        function speak(text, duration = 5000) {
+            if (!text) {
+                return;
+            }
+
+            bubble.textContent = text;
+            bubble.classList.add('companion-bubble-visible');
+            window.clearTimeout(bubbleTimer);
+            bubbleTimer = window.setTimeout(() => {
+                bubble.classList.remove('companion-bubble-visible');
+            }, duration);
+        }
+
+        function hideMenu() {
+            menu.classList.add('hidden');
+        }
+
+        function showMenu(x, y) {
+            menu.classList.remove('hidden');
+            const width = menu.offsetWidth || 180;
+            const height = menu.offsetHeight || 60;
+            menu.style.left = `${Math.min(x, window.innerWidth - width - 12)}px`;
+            menu.style.top = `${Math.min(y, window.innerHeight - height - 12)}px`;
+        }
+
+        function applyHiddenState(hidden) {
+            widget.classList.toggle('hidden', hidden);
+            reopenButton.classList.toggle('hidden', !hidden);
+        }
+
+        function hideWidget(persist = true) {
+            applyHiddenState(true);
+            hideMenu();
+            if (persist) {
+                window.localStorage.setItem(hiddenStorageKey, '1');
+            }
+        }
+
+        function showWidget() {
+            applyHiddenState(false);
+            window.localStorage.removeItem(hiddenStorageKey);
+            hideMenu();
+            if (!live2dLoaded) {
+                loadLive2D();
+            }
+            speak(initialNotice || randomFrom([...authLines, ...idleLines]), 5200);
+        }
+
+        async function loadScript(sources, id) {
+            if (document.getElementById(id)) {
+                return;
+            }
+
+            const candidates = Array.isArray(sources) ? sources : [sources];
+            let lastError = null;
+
+            for (const src of candidates) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const existing = document.getElementById(id);
+                        if (existing) {
+                            existing.remove();
+                        }
+
+                        const script = document.createElement('script');
+                        script.id = id;
+                        script.src = src;
+                        script.async = true;
+                        script.onload = resolve;
+                        script.onerror = () => reject(new Error('Failed to load script: ' + src));
+                        document.head.appendChild(script);
+                    });
+
+                    return;
+                } catch (error) {
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error('Failed to load runtime script.');
+        }
+
+        function fitModel() {
+            if (!live2dApp || !live2dModel || !stage) {
+                return;
+            }
+
+            const width = stage.clientWidth;
+            const height = stage.clientHeight;
+            live2dApp.renderer.resize(width, height);
+
+            const scale = Math.min(width / live2dModel.width, height / live2dModel.height) * 1.14;
+            live2dModel.scale.set(scale);
+            live2dModel.x = (width - live2dModel.width) / 2;
+            live2dModel.y = Math.max(0, height - live2dModel.height + 18);
+        }
+
+        function playMotion() {
+            if (!live2dModel || typeof live2dModel.motion !== 'function') {
+                return;
+            }
+
+            for (const group of ['Tap', 'Tap@Body', 'Flick', 'Flick@Body', 'Idle']) {
+                try {
+                    live2dModel.motion(group);
+                    return;
+                } catch (error) {
+                    continue;
+                }
+            }
+        }
+
+        function triggerWidgetSpeech(preferredDuration = 5200) {
+            const now = Date.now();
+            if (now - lastSpeechTriggerAt < 320) {
+                return;
+            }
+
+            lastSpeechTriggerAt = now;
+            playMotion();
+            speak(randomFrom(Math.random() > 0.35 ? clickLines : factLines), preferredDuration);
+        }
+
+        async function loadLive2D() {
+            if (live2dLoaded) {
+                return;
+            }
+
+            try {
+                await loadScript([
+                    'https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js',
+                    'https://unpkg.com/pixi.js@6.5.10/dist/browser/pixi.min.js'
+                ], 'companion-pixi');
+                await loadScript([
+                    'https://cdn.jsdelivr.net/npm/live2dcubismcore@1.0.2/live2dcubismcore.min.js',
+                    'https://unpkg.com/live2dcubismcore@1.0.2/live2dcubismcore.min.js'
+                ], 'companion-cubism-core');
+                await loadScript([
+                    'https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js',
+                    'https://unpkg.com/pixi-live2d-display@0.4.0/dist/cubism4.min.js'
+                ], 'companion-live2d');
+
+                if (!window.PIXI?.live2d?.Live2DModel) {
+                    throw new Error('Live2D runtime missing.');
+                }
+
+                stageFallback?.remove();
+                live2dApp = new window.PIXI.Application({
+                    autoStart: true,
+                    backgroundAlpha: 0,
+                    resizeTo: stage,
+                    antialias: true,
+                    autoDensity: true,
+                });
+                stage.appendChild(live2dApp.view);
+
+                live2dModel = await window.PIXI.live2d.Live2DModel.from(modelUrl);
+                live2dModel.interactive = true;
+                live2dModel.buttonMode = true;
+                live2dApp.stage.addChild(live2dModel);
+                fitModel();
+                window.addEventListener('resize', fitModel);
+
+                live2dModel.on('pointertap', () => {
+                    triggerWidgetSpeech(5400);
+                });
+
+                live2dApp.view.addEventListener('click', triggerWidgetSpeech);
+                live2dApp.view.addEventListener('pointerdown', () => triggerWidgetSpeech(5400));
+
+                live2dLoaded = true;
+                playMotion();
+                speak(initialNotice || randomFrom([...authLines, ...idleLines]), 5600);
+            } catch (error) {
+                const message = error && error.message ? error.message : 'The model runtime could not be loaded here.';
+                if (stageFallback) {
+                    stageFallback.textContent = `Hiyori is resting. ${message}`;
+                }
+                speak(`The widget loaded, but the Live2D runtime could not start. ${message}`, 6200);
+            }
+        }
+
+        hitbox?.addEventListener('click', () => {
+            triggerWidgetSpeech(5200);
+        });
+
+        hitbox?.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            showMenu(event.clientX, event.clientY);
+        });
+
+        stage.addEventListener('click', () => {
+            triggerWidgetSpeech(5200);
+        });
+
+        widget.addEventListener('click', (event) => {
+            if (event.target.closest('#companion-reopen, #companion-hide-action, #companion-menu')) {
+                return;
+            }
+
+            triggerWidgetSpeech(5200);
+        });
+
+        stage.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            showMenu(event.clientX, event.clientY);
+        });
+
+        widget.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            showMenu(event.clientX, event.clientY);
+        });
+
+        hideAction.addEventListener('click', () => hideWidget(true));
+        reopenButton.addEventListener('click', showWidget);
+
+        document.addEventListener('click', (event) => {
+            if (!menu.contains(event.target)) {
+                hideMenu();
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'Escape') {
+                hideMenu();
+            }
+        });
+
+        window.setInterval(() => {
+            if (!widget.classList.contains('hidden')) {
+                speak(randomFrom([...idleLines, ...authLines]), 5000);
+            }
+        }, 45000);
+
+        const shouldStartHidden = window.localStorage.getItem(hiddenStorageKey) === '1';
+        applyHiddenState(shouldStartHidden);
+
+        if (!shouldStartHidden) {
+            loadLive2D();
+        }
+    })();
+    </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+

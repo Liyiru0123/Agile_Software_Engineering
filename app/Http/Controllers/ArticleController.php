@@ -8,6 +8,7 @@ use App\Models\Exercise;
 use App\Models\ReadingHistory;
 use App\Models\Submission;
 use App\Services\ArticleTextProcessor;
+use App\Services\CompanionService;
 use App\Services\GeminiAudioService;
 use App\Services\OllamaSpeakingService;
 use App\Services\QwenOmniAudioService;
@@ -27,6 +28,7 @@ class ArticleController extends Controller
         protected ReadingExerciseService $readingExerciseService,
         protected SpeakingExerciseService $speakingExerciseService,
         protected WritingExerciseService $writingExerciseService,
+        protected CompanionService $companionService,
         protected GeminiAudioService $geminiAudioService,
         protected OllamaSpeakingService $ollamaSpeakingService,
         protected QwenOmniAudioService $qwenOmniAudioService
@@ -185,11 +187,17 @@ class ArticleController extends Controller
             'created_at' => now(),
         ]);
 
+        $reward = null;
+        if ($request->user()) {
+            $reward = $this->companionService->grantLearningReward($request->user(), 'speaking', $article->id);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Your recording has been submitted and evaluated successfully.',
             'submission_id' => $submission->id,
             'evaluation' => $evaluation,
+            'companion_reward' => $reward,
         ]);
     }
 
@@ -393,3 +401,7 @@ class ArticleController extends Controller
         $history->save();
     }
 }
+
+
+
+
