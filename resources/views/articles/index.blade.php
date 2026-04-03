@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Library - Academic English Learning')
+@section('title', 'Library - EAPlus')
 
 @section('content')
 <div class="max-w-[1440px] mx-auto px-5 md:px-8 xl:px-12">

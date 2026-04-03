@@ -3,11 +3,16 @@
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\FavoritesController;
+use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\ListeningTrainingController;
+use App\Http\Controllers\NotebookController;
 use App\Http\Controllers\ReadingQuestionAttemptController;
 use App\Http\Controllers\SelectionTranslationController;
 use App\Http\Controllers\WritingTrainingController;
 use App\Models\Article;
+use App\Models\ReadingHistory;
+use App\Models\SelectionFavorite;
 use App\Models\Submission;
 use App\Models\UserPlan;
 use Illuminate\Http\Request;
@@ -81,6 +86,63 @@ Route::get('/', function () {
         ->take(6)
         ->get();
 
+    $history = ReadingHistory::query()
+        ->with('article')
+        ->where('user_id', $user->id)
+        ->orderByDesc('last_viewed_at')
+        ->take(5)
+        ->get()
+        ->map(fn (ReadingHistory $item) => [
+            'title' => $item->article?->title ?? 'Untitled Article',
+            'page_label' => $item->page_label,
+            'continue_url' => $item->continue_url,
+            'last_viewed_at' => optional($item->last_viewed_at)?->diffForHumans(),
+        ]);
+
+    $activeDays7d = ReadingHistory::query()
+        ->where('user_id', $user->id)
+        ->where('last_viewed_at', '>=', now()->subDays(6)->startOfDay())
+        ->get()
+        ->pluck('last_viewed_at')
+        ->filter()
+        ->map(fn ($timestamp) => $timestamp->toDateString())
+        ->unique()
+        ->count();
+
+    $latestHistory = ReadingHistory::query()
+        ->where('user_id', $user->id)
+        ->orderByDesc('last_viewed_at')
+        ->first();
+
+    $historySummary = [
+        'recent' => $history,
+        'active_days_7d' => $activeDays7d,
+        'continue_url' => $latestHistory?->continue_url ?? route('articles.index'),
+    ];
+
+    $notebook = SelectionFavorite::query()
+        ->with('article')
+        ->where('user_id', $user->id)
+        ->orderByDesc('created_at')
+        ->take(3)
+        ->get()
+        ->map(fn (SelectionFavorite $item) => [
+            'text' => $item->selected_text,
+            'article_title' => $item->article?->title ?? 'Untitled Article',
+            'article_url' => route('articles.show', $item->article_id),
+        ]);
+
+    $notebookSummary = [
+        'new_this_week' => SelectionFavorite::query()
+            ->where('user_id', $user->id)
+            ->where('created_at', '>=', now()->subWeek())
+            ->count(),
+        'review_pending' => SelectionFavorite::query()
+            ->where('user_id', $user->id)
+            ->count(),
+        'recent' => $notebook,
+    ];
+
     return view('home', compact(
         'stats',
         'plans',
@@ -89,12 +151,18 @@ Route::get('/', function () {
         'pendingPlans',
         'articles',
         'favoritedArticles',
+        'history',
+        'historySummary',
+        'notebook',
+        'notebookSummary',
         'today',
         'currentMonth',
         'expiredPlans',
         'overduePlans'
     ));
 })->name('home')->middleware('auth');
+
+Route::get('/dashboard', fn () => redirect()->route('home'))->name('dashboard')->middleware('auth');
 
 Route::delete('/plans/{plan}', function (UserPlan $plan) {
     if ($plan->user_id !== auth()->id()) {
@@ -227,15 +295,14 @@ Route::post('/articles/{article}/toggle-favorite', function (Article $article) {
     return response()->json(['favorited' => true, 'message' => 'Added to favorites']);
 })->name('articles.toggle-favorite')->middleware('auth');
 
-Route::get('/favorites', function () {
-    $favorites = DB::table('user_favorites')
-        ->join('articles', 'user_favorites.article_id', '=', 'articles.id')
-        ->where('user_favorites.user_id', auth()->id())
-        ->select('articles.*')
-        ->get();
+Route::get('/history', [HistoryController::class, 'index'])->name('history.index')->middleware('auth');
+Route::get('/history/continue', [HistoryController::class, 'continue'])->name('history.continue')->middleware('auth');
+Route::get('/notebook', [NotebookController::class, 'index'])->name('notebook.index')->middleware('auth');
+Route::get('/notebook/review', [NotebookController::class, 'review'])->name('notebook.review')->middleware('auth');
 
-    return view('favorites.index', compact('favorites'));
-})->name('favorites.index')->middleware('auth');
+Route::get('/favorites', [FavoritesController::class, 'index'])->name('favorites.index')->middleware('auth');
+Route::get('/favorites/plan', [FavoritesController::class, 'plan'])->name('favorites.plan')->middleware('auth');
+Route::post('/favorites/plan', [FavoritesController::class, 'storePlan'])->name('favorites.plan.store')->middleware('auth');
 
 Route::get('/login', function () {
     return view('auth.login');

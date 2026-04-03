@@ -63,11 +63,78 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
     {{-- Header --}}
-    <section class="rounded-2xl border border-[#E6D3BC] bg-[#FDF7EE]/90 shadow-sm p-6">
-        <div>
-            <div>
-                <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-[#4A2C2A]">Learning Hub</h1>
-                <p class="mt-2 text-[#8B6B47]">Act first, then reflect. Start with one task today.</p>
+    <section class="overflow-hidden rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE]/90 shadow-sm">
+        <div class="grid lg:grid-cols-[minmax(0,1.2fr)_430px] gap-0">
+            <div class="px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+                <div class="inline-flex items-center rounded-full bg-[#F3E7D8] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8B6B47]">
+                    EAPlus Learning Hub
+                </div>
+
+                <h1 class="mt-5 text-4xl sm:text-5xl font-black tracking-tight text-[#4A2C2A] leading-[1.05]">
+                    Learn English with a calmer pace and a clearer focus.
+                </h1>
+
+                <p class="mt-4 max-w-2xl text-[#8B6B47] text-base sm:text-lg leading-8">
+                    Act first, then reflect. Start one task today, keep your favorites close, and return to the articles and excerpts that matter most.
+                </p>
+
+                <div class="mt-6 flex flex-wrap gap-3">
+                    <div class="rounded-2xl border border-[#E2CFB3] bg-white/80 px-4 py-3">
+                        <div class="text-xs uppercase tracking-[0.14em] text-[#A58A6A]">Saved Articles</div>
+                        <div class="mt-1 text-2xl font-black text-[#4A2C2A]">{{ $favoritesSummary['total'] }}</div>
+                    </div>
+                    <div class="rounded-2xl border border-[#E2CFB3] bg-white/80 px-4 py-3">
+                        <div class="text-xs uppercase tracking-[0.14em] text-[#A58A6A]">Notebook Entries</div>
+                        <div class="mt-1 text-2xl font-black text-[#4A2C2A]">{{ $notebookSummary['review_pending'] }}</div>
+                    </div>
+                    <div class="rounded-2xl border border-[#E2CFB3] bg-white/80 px-4 py-3">
+                        <div class="text-xs uppercase tracking-[0.14em] text-[#A58A6A]">Recent Activity</div>
+                        <div class="mt-1 text-2xl font-black text-[#4A2C2A]">{{ $historySummary['active_days_7d'] }}d</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative min-h-[320px] lg:min-h-full bg-[radial-gradient(circle_at_top,_rgba(255,245,230,0.95),_rgba(233,198,154,0.65)_32%,_rgba(136,88,66,0.88)_72%,_rgba(74,44,42,1)_100%)]">
+                <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),transparent_45%,rgba(74,44,42,0.18))]"></div>
+
+                <div class="absolute right-6 top-6 w-[72%] max-w-[290px] rounded-[2rem] border border-white/30 bg-white/12 p-4 backdrop-blur-sm shadow-[0_20px_45px_rgba(44,24,16,0.25)]">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/80 mb-3">Sunset Focus</div>
+                    <div class="overflow-hidden rounded-[1.5rem] bg-[linear-gradient(180deg,#ffd8a8_0%,#ffb67a_28%,#cf7d57_52%,#6b3d2e_80%,#3a2221_100%)]">
+                        <svg viewBox="0 0 320 220" class="w-full h-auto" role="img" aria-label="Sunset over hills">
+                            <defs>
+                                <linearGradient id="sun-glow" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#fff1c9" stop-opacity="0.95"/>
+                                    <stop offset="100%" stop-color="#ffd27d" stop-opacity="0.15"/>
+                                </linearGradient>
+                            </defs>
+                            <circle cx="220" cy="72" r="40" fill="url(#sun-glow)"/>
+                            <circle cx="220" cy="72" r="28" fill="#ffe7a3"/>
+                            <path d="M0 168 C46 150 88 154 128 171 C172 189 220 190 320 152 L320 220 L0 220 Z" fill="#764232"/>
+                            <path d="M0 184 C64 160 126 170 172 188 C220 206 260 202 320 176 L320 220 L0 220 Z" fill="#4a2c2a"/>
+                            <path d="M18 148 C44 132 64 130 90 142" stroke="#fff0c7" stroke-opacity="0.75" stroke-width="3" stroke-linecap="round" fill="none"/>
+                            <path d="M70 118 C102 98 126 94 154 108" stroke="#fff0c7" stroke-opacity="0.48" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="absolute left-6 bottom-6 w-[68%] max-w-[250px] rounded-[2rem] border border-white/20 bg-[#fdf7ee]/90 p-4 shadow-[0_16px_40px_rgba(44,24,16,0.2)]">
+                    <div class="text-[11px] font-bold uppercase tracking-[0.2em] text-[#8B6B47] mb-3">Book Stack</div>
+                    <div class="overflow-hidden rounded-[1.5rem] bg-[linear-gradient(180deg,#fffaf3_0%,#f5e5d0_100%)]">
+                        <svg viewBox="0 0 280 210" class="w-full h-auto" role="img" aria-label="Stack of books and notes">
+                            <rect width="280" height="210" fill="#fffaf3"/>
+                            <rect x="38" y="150" width="170" height="18" rx="8" fill="#6b3d2e"/>
+                            <rect x="45" y="132" width="170" height="16" rx="8" fill="#d8b777"/>
+                            <rect x="55" y="114" width="170" height="16" rx="8" fill="#8a654e"/>
+                            <rect x="66" y="96" width="170" height="16" rx="8" fill="#c9a961"/>
+                            <rect x="176" y="54" width="52" height="34" rx="8" fill="#fff" stroke="#d7c2a8" stroke-width="2"/>
+                            <path d="M186 64 H218" stroke="#a58a6a" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M186 72 H212" stroke="#c0a27c" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M186 80 H220" stroke="#d3b18a" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M88 84 C106 60 130 48 150 48 C176 48 194 64 200 92" fill="none" stroke="#4a2c2a" stroke-width="6" stroke-linecap="round"/>
+                            <path d="M92 86 C116 74 136 72 158 78" fill="none" stroke="#f3e7d8" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -229,8 +296,8 @@
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h4 class="text-lg font-black text-[#4A2C2A]">Favorites</h4>
                     <div class="flex flex-wrap items-center justify-end gap-2">
-                        <a href="{{ url('/favorites') }}" class="px-4 py-2 rounded-lg bg-[#4A2C2A] hover:bg-[#6B3D2E] text-[#F5E6D3] text-sm font-semibold hover:bg-[#6B3D2E] transition">Open Favorites</a>
-                        <a href="{{ url('/favorites/plan') }}" class="px-4 py-2 rounded-lg border border-[#C9A961] text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">Generate Plan from Favorites</a>
+                        <a href="{{ route('favorites.index') }}" class="px-4 py-2 rounded-lg bg-[#4A2C2A] hover:bg-[#6B3D2E] text-[#F5E6D3] text-sm font-semibold hover:bg-[#6B3D2E] transition">Open Favorites</a>
+                        <a href="{{ route('favorites.plan') }}" class="px-4 py-2 rounded-lg border border-[#C9A961] text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">Generate Plan from Favorites</a>
                     </div>
                 </div>
                 <div class="mt-4 grid grid-cols-2 gap-3">
@@ -296,7 +363,10 @@
                 </div>
                 <div class="mt-4 space-y-2">
                     @forelse(collect($notebookSummary['recent']) as $item)
-                        <div class="text-sm text-[#6B3D2E] truncate">• {{ $item->text ?? ($item['text'] ?? 'Untitled Note') }}</div>
+                        <div class="rounded-lg bg-[#F9EFE2] px-3 py-2">
+                            <div class="text-sm text-[#6B3D2E] truncate">{{ $item->text ?? ($item['text'] ?? 'Untitled Note') }}</div>
+                            <div class="mt-1 text-xs text-[#A58A6A] truncate">{{ $item->article_title ?? ($item['article_title'] ?? 'Untitled Article') }}</div>
+                        </div>
                     @empty
                         <div class="text-sm text-[#A58A6A]">No notes yet</div>
                     @endforelse

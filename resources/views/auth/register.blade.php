@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Register - Academic English Learning')
+@section('title', 'Register - EAPlus')
 
 @section('content')
 <div class="min-h-screen flex items-center justify-center bg-darkWood py-12 px-4 sm:px-6 lg:px-8">
@@ -10,7 +10,7 @@
         <!-- Logo / Title -->
         <div class="text-center">
             <h2 class="mt-2 text-3xl font-serif font-bold text-silkGold">
-                Academic English
+                {{ config('app.name', 'EAPlus') }}
             </h2>
             <p class="mt-2 text-sm text-silkGold/70">
                 Create your account and start learning
