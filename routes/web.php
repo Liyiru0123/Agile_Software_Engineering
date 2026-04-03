@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnalysisController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -164,6 +165,7 @@ Route::get('/', function () {
 })->name('home')->middleware('auth');
 
 Route::get('/dashboard', fn () => redirect()->route('home'))->name('dashboard')->middleware('auth');
+Route::get('/analysis/study', [AnalysisController::class, 'studyAnalysis'])->name('study.analysis')->middleware('auth');
 
 Route::delete('/plans/{plan}', function (UserPlan $plan) {
     if ($plan->user_id !== auth()->id()) {
