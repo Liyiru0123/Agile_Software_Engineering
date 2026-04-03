@@ -7,6 +7,7 @@ use App\Http\Controllers\FavoritesController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\ListeningTrainingController;
 use App\Http\Controllers\NotebookController;
+use App\Http\Controllers\CompanionController;
 use App\Http\Controllers\ReadingQuestionAttemptController;
 use App\Http\Controllers\SelectionTranslationController;
 use App\Http\Controllers\WritingTrainingController;
@@ -303,6 +304,9 @@ Route::get('/notebook/review', [NotebookController::class, 'review'])->name('not
 Route::get('/favorites', [FavoritesController::class, 'index'])->name('favorites.index')->middleware('auth');
 Route::get('/favorites/plan', [FavoritesController::class, 'plan'])->name('favorites.plan')->middleware('auth');
 Route::post('/favorites/plan', [FavoritesController::class, 'storePlan'])->name('favorites.plan.store')->middleware('auth');
+Route::get('/companion', [CompanionController::class, 'index'])->name('companion.index')->middleware('auth');
+Route::post('/companion/shop/{item}/purchase', [CompanionController::class, 'purchase'])->name('companion.purchase')->middleware('auth');
+Route::post('/companion/shop/{item}/equip', [CompanionController::class, 'equip'])->name('companion.equip')->middleware('auth');
 
 Route::get('/login', function () {
     return view('auth.login');
@@ -316,3 +320,6 @@ Route::get('/register', function () {
 })->name('register')->middleware('guest');
 
 Route::post('/register', [RegisterController::class, 'register'])->name('register.post');
+
+
+

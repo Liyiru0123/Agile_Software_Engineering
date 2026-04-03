@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\ListeningExerciseService;
 use App\Models\Article;
 use App\Models\Exercise;
+use App\Services\CompanionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -12,7 +13,8 @@ use Illuminate\Validation\Rule;
 class ListeningTrainingController extends Controller
 {
     public function __construct(
-        protected ListeningExerciseService $listeningExerciseService
+        protected ListeningExerciseService $listeningExerciseService,
+        protected CompanionService $companionService
     ) {
     }
 
@@ -26,15 +28,22 @@ class ListeningTrainingController extends Controller
         ]);
 
         $exercise = Exercise::query()->findOrFail($payload['exercise_id']);
+        $result = $this->listeningExerciseService->evaluateSubmission(
+            article: $article,
+            exercise: $exercise,
+            answers: $payload['answers'],
+            userId: $request->user()?->id,
+            timeSpent: $payload['time_spent'] ?? 0,
+        );
+
+        $reward = null;
+        if ($request->user()) {
+            $reward = $this->companionService->grantLearningReward($request->user(), 'listening', $article->id);
+        }
 
         return response()->json([
-            'result' => $this->listeningExerciseService->evaluateSubmission(
-                article: $article,
-                exercise: $exercise,
-                answers: $payload['answers'],
-                userId: $request->user()?->id,
-                timeSpent: $payload['time_spent'] ?? 0,
-            ),
+            'result' => $result,
+            'companion_reward' => $reward,
         ]);
     }
 }
