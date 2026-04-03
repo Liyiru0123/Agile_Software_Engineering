@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\ListeningExerciseService;
 use App\Models\Article;
 use App\Models\Exercise;
+use App\Models\ReadingHistory;
 use App\Models\Submission;
 use App\Services\ArticleTextProcessor;
+use App\Services\CompanionService;
 use App\Services\GeminiAudioService;
 use App\Services\OllamaSpeakingService;
 use App\Services\QwenOmniAudioService;
@@ -26,6 +28,7 @@ class ArticleController extends Controller
         protected ReadingExerciseService $readingExerciseService,
         protected SpeakingExerciseService $speakingExerciseService,
         protected WritingExerciseService $writingExerciseService,
+        protected CompanionService $companionService,
         protected GeminiAudioService $geminiAudioService,
         protected OllamaSpeakingService $ollamaSpeakingService,
         protected QwenOmniAudioService $qwenOmniAudioService
@@ -41,11 +44,15 @@ class ArticleController extends Controller
 
     public function show(Article $article): View
     {
+        $this->recordHistory($article, 'article');
+
         return view('articles.show', $this->buildPageData($article));
     }
 
     public function listening(Article $article): View
     {
+        $this->recordHistory($article, 'listening');
+
         $data = $this->buildPageData($article);
         $data['listeningExercise'] = $this->listeningExerciseService->getForArticle(
             $article,
@@ -57,6 +64,8 @@ class ArticleController extends Controller
 
     public function speaking(Article $article): View
     {
+        $this->recordHistory($article, 'speaking');
+
         $data = $this->buildPageData($article);
         $exercises = $article->exercises()->where('type', 'speaking')->get();
         $data['speakingExercises'] = $exercises;
@@ -178,16 +187,24 @@ class ArticleController extends Controller
             'created_at' => now(),
         ]);
 
+        $reward = null;
+        if ($request->user()) {
+            $reward = $this->companionService->grantLearningReward($request->user(), 'speaking', $article->id);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Your recording has been submitted and evaluated successfully.',
             'submission_id' => $submission->id,
             'evaluation' => $evaluation,
+            'companion_reward' => $reward,
         ]);
     }
 
     public function reading(Article $article): View
     {
+        $this->recordHistory($article, 'reading');
+
         $data = $this->buildPageData($article);
         $data['readingExercise'] = $article->exercises()->where('type', 'reading')->first();
         $data['readingQuestions'] = $this->readingExerciseService->getPublicQuestions($article);
@@ -199,6 +216,8 @@ class ArticleController extends Controller
 
     public function writing(Article $article): View
     {
+        $this->recordHistory($article, 'writing');
+
         $data = $this->buildPageData($article);
         $data = array_merge($data, $this->writingExerciseService->buildPagePayload(
             article: $article,
@@ -361,4 +380,28 @@ class ArticleController extends Controller
             default => 'General',
         };
     }
+
+    protected function recordHistory(Article $article, string $page): void
+    {
+        $userId = auth()->id();
+
+        if (! $userId) {
+            return;
+        }
+
+        $history = ReadingHistory::query()->firstOrNew([
+            'user_id' => $userId,
+            'article_id' => $article->id,
+        ]);
+
+        $history->last_page = $page;
+        $history->last_viewed_at = now();
+        $history->visit_count = $history->exists ? ((int) $history->visit_count + 1) : 1;
+        $history->first_viewed_at ??= now();
+        $history->save();
+    }
 }
+
+
+
+

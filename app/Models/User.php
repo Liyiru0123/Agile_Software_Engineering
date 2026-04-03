@@ -5,6 +5,8 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -14,6 +16,21 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Article::class, 'user_favorites')
                     ->withPivot('created_at');
+    }
+
+    public function companionProfile(): HasOne
+    {
+        return $this->hasOne(CompanionProfile::class);
+    }
+
+    public function companionInventory(): HasMany
+    {
+        return $this->hasMany(CompanionInventory::class);
+    }
+
+    public function companionTransactions(): HasMany
+    {
+        return $this->hasMany(CompanionTransaction::class);
     }
 
     /** @use HasFactory<UserFactory> */

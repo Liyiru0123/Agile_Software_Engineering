@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Article;
+use App\Services\CompanionService;
 use App\Services\ReadingExerciseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,7 +11,8 @@ use Illuminate\Http\Request;
 class ReadingQuestionAttemptController extends Controller
 {
     public function __construct(
-        protected ReadingExerciseService $readingExerciseService
+        protected ReadingExerciseService $readingExerciseService,
+        protected CompanionService $companionService
     ) {
     }
 
@@ -30,8 +32,16 @@ class ReadingQuestionAttemptController extends Controller
             'answers.*.selected' => ['nullable', 'string', 'max:10'],
         ]);
 
-        return response()->json(
-            $this->readingExerciseService->evaluate($article, $payload['answers'])
-        );
+        $result = $this->readingExerciseService->evaluate($article, $payload['answers']);
+        $reward = null;
+
+        if ($request->user()) {
+            $reward = $this->companionService->grantLearningReward($request->user(), 'reading', $article->id);
+        }
+
+        return response()->json(array_merge(
+            $result,
+            ['companion_reward' => $reward]
+        ));
     }
 }

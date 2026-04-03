@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Article;
 use App\Models\Exercise;
+use App\Services\CompanionService;
 use App\WritingExerciseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,8 @@ use Illuminate\Validation\Rule;
 class WritingTrainingController extends Controller
 {
     public function __construct(
-        protected WritingExerciseService $writingExerciseService
+        protected WritingExerciseService $writingExerciseService,
+        protected CompanionService $companionService
     ) {
     }
 
@@ -25,15 +27,22 @@ class WritingTrainingController extends Controller
         ]);
 
         $exercise = Exercise::query()->findOrFail($payload['exercise_id']);
+        $result = $this->writingExerciseService->evaluateSubmission(
+            article: $article,
+            exercise: $exercise,
+            draft: $payload['draft'],
+            userId: $request->user()?->id,
+            timeSpent: $payload['time_spent'] ?? 0,
+        );
+
+        $reward = null;
+        if ($request->user()) {
+            $reward = $this->companionService->grantLearningReward($request->user(), 'writing', $article->id);
+        }
 
         return response()->json([
-            'result' => $this->writingExerciseService->evaluateSubmission(
-                article: $article,
-                exercise: $exercise,
-                draft: $payload['draft'],
-                userId: $request->user()?->id,
-                timeSpent: $payload['time_spent'] ?? 0,
-            ),
+            'result' => $result,
+            'companion_reward' => $reward,
         ]);
     }
 }
