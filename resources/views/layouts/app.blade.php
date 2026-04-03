@@ -228,7 +228,7 @@
     </div>
 
     <div id="companion-shell" class="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3">
-        <button id="companion-reopen" type="button" class="hidden rounded-full border border-[#D9C7B5] bg-white/95 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#4A2C2A] shadow-lg hover:bg-[#FBF7F1] transition">
+        <button id="companion-reopen" type="button" class="hidden fixed bottom-4 right-4 z-[61] rounded-full border border-[#D9C7B5] bg-white/95 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#4A2C2A] shadow-lg hover:bg-[#FBF7F1] transition">
             Open Hiyori
         </button>
 
@@ -632,15 +632,17 @@
         }
 
         function speak(text, duration = 5000) {
-            if (!text) {
+            if (!text || !bubble) {
                 return;
             }
 
             bubble.textContent = text;
-            bubble.classList.add('companion-bubble-visible');
+            bubble.style.opacity = '1';
+            bubble.style.transform = 'translateY(0)';
             window.clearTimeout(bubbleTimer);
             bubbleTimer = window.setTimeout(() => {
-                bubble.classList.remove('companion-bubble-visible');
+                bubble.style.opacity = '0';
+                bubble.style.transform = 'translateY(0.5rem)';
             }, duration);
         }
 
