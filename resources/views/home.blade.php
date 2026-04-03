@@ -378,7 +378,7 @@
             <article class="rounded-2xl border border-[#E6D3BC] bg-[#FDF7EE] shadow-sm p-6">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h4 class="text-lg font-black text-[#4A2C2A]">Study Status Analysis</h4>
-                    <a href="{{ url('/analysis?range=' . $timeRange) }}"
+                    <a href="{{ route('study.analysis', ['range' => $timeRange]) }}"
                        class="inline-flex items-center px-4 py-2 rounded-lg bg-[#4A2C2A] hover:bg-[#6B3D2E] text-[#F5E6D3] text-sm font-semibold hover:bg-[#6B3D2E] transition">
                         View Full Analysis Report
                     </a>
