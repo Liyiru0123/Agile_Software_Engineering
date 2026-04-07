@@ -35,6 +35,7 @@ class AnalysisController extends Controller
         $overview = $this->buildOverviewModule($submissions, $plans, $articleCount, $endAt);
         $effort = $this->buildEffortModule($submissions, $plans, $startAt, $endAt);
         $outcomes = $this->buildOutcomeModule($submissions, $startAt, $endAt);
+        $capabilityDiagnosis = $this->buildCapabilityDiagnosisModule($userId, $startAt, $endAt);
 
         return view('analysis.study-analysis', [
             'selectedRange' => $rangeKey,
@@ -43,6 +44,7 @@ class AnalysisController extends Controller
             'overview' => $overview,
             'effort' => $effort,
             'outcomes' => $outcomes,
+            'capabilityDiagnosis' => $capabilityDiagnosis,
         ]);
     }
 
