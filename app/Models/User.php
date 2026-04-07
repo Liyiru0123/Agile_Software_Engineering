@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -33,6 +34,33 @@ class User extends Authenticatable
         return $this->hasMany(CompanionTransaction::class);
     }
 
+    public function forumTags(): HasMany
+    {
+        return $this->hasMany(ForumTag::class);
+    }
+
+    public function forumPosts(): HasMany
+    {
+        return $this->hasMany(ForumPost::class);
+    }
+
+    public function forumComments(): HasMany
+    {
+        return $this->hasMany(ForumComment::class);
+    }
+
+    public function likedForumPosts(): BelongsToMany
+    {
+        return $this->belongsToMany(ForumPost::class, 'forum_post_likes')
+            ->withTimestamps();
+    }
+
+    public function favoritedForumPosts(): BelongsToMany
+    {
+        return $this->belongsToMany(ForumPost::class, 'forum_post_favorites')
+            ->withTimestamps();
+    }
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
@@ -45,6 +73,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_admin',
     ];
 
     /**
@@ -67,6 +96,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
     }
 }
