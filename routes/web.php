@@ -345,6 +345,16 @@ Route::post('/articles/{article}/listening/evaluate', [ListeningTrainingControll
 Route::post('/articles/{article}/writing/evaluate', [WritingTrainingController::class, 'evaluate'])->name('articles.writing.evaluate')->middleware('auth');
 Route::post('/selection/translate', [SelectionTranslationController::class, 'translate'])->name('selection.translate')->middleware('auth');
 Route::post('/selection/save', [SelectionTranslationController::class, 'save'])->name('selection.save')->middleware('auth');
+Route::get('/games/wordle', function () {
+    $words = DB::table('wordle_words')
+        ->where('is_active', true)
+        ->pluck('word')
+        ->map(fn ($word) => strtoupper((string) $word))
+        ->values()
+        ->all();
+
+    return view('games.wordle', compact('words'));
+})->name('games.wordle')->middleware('auth');
 
 Route::post('/articles/{article}/toggle-favorite', function (Article $article) {
     $user = auth()->user();
