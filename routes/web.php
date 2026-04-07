@@ -226,7 +226,16 @@ Route::get('/', function () {
 
 Route::get('/dashboard', fn () => redirect()->route('home'))->name('dashboard')->middleware('auth');
 Route::get('/analysis/study', [AnalysisController::class, 'studyAnalysis'])->name('study.analysis')->middleware('auth');
-Route::view('/game', 'game.index')->name('game.index')->middleware('auth');
+Route::get('/game', function () {
+    $words = DB::table('wordle_words')
+        ->where('is_active', true)
+        ->pluck('word')
+        ->map(fn ($word) => strtoupper((string) $word))
+        ->values()
+        ->all();
+
+    return view('games.wordle', compact('words'));
+})->name('game.index')->middleware('auth');
 
 Route::delete('/plans/{plan}', function (UserPlan $plan) {
     if ($plan->user_id !== auth()->id()) {
@@ -346,14 +355,7 @@ Route::post('/articles/{article}/writing/evaluate', [WritingTrainingController::
 Route::post('/selection/translate', [SelectionTranslationController::class, 'translate'])->name('selection.translate')->middleware('auth');
 Route::post('/selection/save', [SelectionTranslationController::class, 'save'])->name('selection.save')->middleware('auth');
 Route::get('/games/wordle', function () {
-    $words = DB::table('wordle_words')
-        ->where('is_active', true)
-        ->pluck('word')
-        ->map(fn ($word) => strtoupper((string) $word))
-        ->values()
-        ->all();
-
-    return view('games.wordle', compact('words'));
+    return redirect()->route('game.index');
 })->name('games.wordle')->middleware('auth');
 
 Route::post('/articles/{article}/toggle-favorite', function (Article $article) {
