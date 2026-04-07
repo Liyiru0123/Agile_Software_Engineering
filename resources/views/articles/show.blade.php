@@ -61,8 +61,20 @@
                      data-article-id="{{ $article->id }}"
                      data-source-language="en"
                      data-target-language="zh-CN">
-                    @foreach($paragraphs as $paragraph)
-                        <p data-article-id="{{ $article->id }}" data-paragraph-index="{{ $loop->index }}">{{ $paragraph }}</p>
+                    @foreach($articleParagraphs as $paragraph)
+                        <section class="rounded-3xl border border-[#EEE2D4] bg-[#FCF8F2] px-5 py-4">
+                            <div class="flex flex-wrap items-center gap-2 mb-3">
+                                <span class="inline-flex items-center rounded-full bg-[#4A2C2A] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                                    Paragraph {{ $paragraph['display_index'] }}
+                                </span>
+                                @if(!empty($paragraph['time_range_label']))
+                                    <span class="inline-flex items-center rounded-full bg-[#F3E7D8] px-3 py-1 text-[11px] font-semibold text-[#6B3D2E]">
+                                        {{ $paragraph['time_range_label'] }}
+                                    </span>
+                                @endif
+                            </div>
+                            <p data-article-id="{{ $article->id }}" data-paragraph-index="{{ $loop->index }}">{{ $paragraph['text'] }}</p>
+                        </section>
                     @endforeach
                 </div>
             </section>

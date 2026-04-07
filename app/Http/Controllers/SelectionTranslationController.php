@@ -64,7 +64,11 @@ class SelectionTranslationController extends Controller
         ]);
 
         $article = Article::query()->findOrFail($payload['article_id']);
-        $paragraphs = array_values($this->processor->splitParagraphs($article->content));
+        $article->loadMissing(['segments' => fn ($query) => $query
+            ->orderBy('paragraph_index')
+            ->orderBy('sentence_index')
+            ->orderBy('id')]);
+        $paragraphs = $this->resolveArticleParagraphs($article);
         $paragraphIndex = (int) $payload['paragraph_index'];
 
         if (! array_key_exists($paragraphIndex, $paragraphs)) {
@@ -127,5 +131,28 @@ class SelectionTranslationController extends Controller
                 ? 'Saved to favorites.'
                 : 'Already saved. The translation has been refreshed.',
         ]);
+    }
+
+    protected function resolveArticleParagraphs(Article $article): array
+    {
+        if ($article->relationLoaded('segments') && $article->segments->isNotEmpty()) {
+            return $article->segments
+                ->groupBy('paragraph_index')
+                ->map(function ($group) {
+                    return $group
+                        ->sortBy([
+                            ['sentence_index', 'asc'],
+                            ['id', 'asc'],
+                        ])
+                        ->pluck('content_en')
+                        ->filter(fn ($value) => filled($value))
+                        ->map(fn ($value) => trim((string) $value))
+                        ->implode(' ');
+                })
+                ->values()
+                ->all();
+        }
+
+        return array_values($this->processor->splitParagraphs($article->content));
     }
 }

@@ -69,7 +69,7 @@ class ArticleController extends Controller
         $data['listeningSummaryTask'] = collect($writingTasks)->firstWhere('task_type', 'summary_response')
             ?? ($writingTasks[0] ?? null);
         $data['listeningReadingQuestions'] = $this->readingExerciseService->getPublicQuestions($article);
-        $data['articleSentenceMap'] = $this->buildArticleSentenceMap($data['paragraphs']);
+        $data['articleSentenceMap'] = $this->buildArticleSentenceMap($data['articleParagraphs']);
 
         $latestReadingResult = null;
         if (auth()->id()) {
@@ -263,7 +263,7 @@ class ArticleController extends Controller
         $data = $this->buildPageData($article);
         $data['readingExercise'] = $article->exercises()->where('type', 'reading')->first();
         $data['readingQuestions'] = $this->readingExerciseService->getPublicQuestions($article);
-        $data['articleSentenceMap'] = $this->buildArticleSentenceMap($data['paragraphs']);
+        $data['articleSentenceMap'] = $this->buildArticleSentenceMap($data['articleParagraphs']);
         $data['keywords'] = $this->extractKeywords($article->content);
 
         return view('articles.reading', $data);
@@ -284,13 +284,23 @@ class ArticleController extends Controller
 
     protected function buildPageData(Article $article): array
     {
-        $paragraphs = $this->processor->splitParagraphs($article->content);
+        $article->loadMissing(['segments' => fn ($query) => $query
+            ->orderBy('paragraph_index')
+            ->orderBy('sentence_index')
+            ->orderBy('id')]);
+
+        $articleParagraphs = $this->resolveArticleParagraphs($article);
+        $paragraphs = collect($articleParagraphs)
+            ->pluck('text')
+            ->values()
+            ->all();
         $sentences = collect($paragraphs)
             ->flatMap(fn (string $paragraph) => $this->processor->splitSentences($paragraph))
             ->values();
 
         return [
             'article' => $article,
+            'articleParagraphs' => $articleParagraphs,
             'paragraphs' => $paragraphs,
             'sentences' => $sentences,
             'audioUrl' => $this->resolveAudioUrl($article->audio_url),
@@ -396,13 +406,23 @@ class ArticleController extends Controller
     protected function buildArticleSentenceMap(array $paragraphs): array
     {
         return collect($paragraphs)
-            ->map(function (string $paragraph, int $paragraphIndex) {
+            ->map(function (array|string $paragraph, int $paragraphIndex) {
+                $paragraphText = is_array($paragraph)
+                    ? (string) ($paragraph['text'] ?? '')
+                    : (string) $paragraph;
+                $displayIndex = is_array($paragraph) && isset($paragraph['display_index'])
+                    ? (int) $paragraph['display_index']
+                    : ($paragraphIndex + 1);
+
                 return [
                     'paragraph_index' => $paragraphIndex,
-                    'sentences' => collect($this->processor->splitSentences($paragraph))
+                    'display_index' => $displayIndex,
+                    'label' => 'Paragraph '.$displayIndex,
+                    'time_range_label' => is_array($paragraph) ? ($paragraph['time_range_label'] ?? null) : null,
+                    'sentences' => collect($this->processor->splitSentences($paragraphText))
                         ->map(fn (string $sentence, int $sentenceIndex) => [
                             'anchor' => 'p'.$paragraphIndex.'-s'.$sentenceIndex,
-                            'label' => 'Paragraph '.($paragraphIndex + 1).', sentence '.($sentenceIndex + 1),
+                            'label' => 'Paragraph '.$displayIndex.', sentence '.($sentenceIndex + 1),
                             'text' => $sentence,
                         ])
                         ->values()
@@ -411,6 +431,79 @@ class ArticleController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    protected function resolveArticleParagraphs(Article $article): array
+    {
+        $segments = $article->segments ?? collect();
+
+        if ($segments->isNotEmpty()) {
+            return $segments
+                ->groupBy('paragraph_index')
+                ->map(function ($group, $paragraphIndex) {
+                    $ordered = $group
+                        ->sortBy([
+                            ['sentence_index', 'asc'],
+                            ['id', 'asc'],
+                        ])
+                        ->values();
+
+                    $text = $ordered
+                        ->pluck('content_en')
+                        ->filter(fn ($value) => filled($value))
+                        ->map(fn ($value) => trim((string) $value))
+                        ->implode(' ');
+
+                    $startTime = $ordered
+                        ->pluck('start_time')
+                        ->filter(fn ($value) => $value !== null)
+                        ->map(fn ($value) => (float) $value)
+                        ->min();
+                    $endTime = $ordered
+                        ->pluck('end_time')
+                        ->filter(fn ($value) => $value !== null)
+                        ->map(fn ($value) => (float) $value)
+                        ->max();
+
+                    return [
+                        'display_index' => (int) $paragraphIndex,
+                        'text' => trim($text),
+                        'start_time' => $startTime,
+                        'end_time' => $endTime,
+                        'time_range_label' => $startTime !== null && $endTime !== null && $endTime > $startTime
+                            ? $this->formatTimeRange($startTime, $endTime)
+                            : null,
+                    ];
+                })
+                ->filter(fn (array $paragraph) => $paragraph['text'] !== '')
+                ->values()
+                ->all();
+        }
+
+        return collect($this->processor->splitParagraphs($article->content))
+            ->values()
+            ->map(fn (string $paragraph, int $index) => [
+                'display_index' => $index + 1,
+                'text' => $paragraph,
+                'start_time' => null,
+                'end_time' => null,
+                'time_range_label' => null,
+            ])
+            ->all();
+    }
+
+    protected function formatTimeRange(float $startTime, float $endTime): string
+    {
+        return $this->formatSeconds($startTime).' - '.$this->formatSeconds($endTime);
+    }
+
+    protected function formatSeconds(float $seconds): string
+    {
+        $rounded = max(0, (int) round($seconds));
+        $minutes = intdiv($rounded, 60);
+        $remainingSeconds = $rounded % 60;
+
+        return sprintf('%02d:%02d', $minutes, $remainingSeconds);
     }
 
     protected function resolveShadowingExercise(Article $article): Exercise

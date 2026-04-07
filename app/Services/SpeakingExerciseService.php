@@ -3,8 +3,7 @@
 namespace App\Services;
 
 use App\Models\Article;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
+use App\Models\ArticleSegment;
 
 class SpeakingExerciseService
 {
@@ -15,6 +14,12 @@ class SpeakingExerciseService
 
     public function buildShadowingClips(Article $article, int $maxClips = 6): array
     {
+        $segmentClips = $this->buildSegmentShadowingClips($article);
+
+        if ($segmentClips !== []) {
+            return $segmentClips;
+        }
+
         $chunks = $this->buildShadowingChunks($article->content);
 
         if ($chunks === []) {
@@ -43,6 +48,50 @@ class SpeakingExerciseService
     {
         return collect($this->buildShadowingClips($article))
             ->first(fn (array $clip) => ($clip['id'] ?? null) === $clipId);
+    }
+
+    protected function buildSegmentShadowingClips(Article $article): array
+    {
+        /** @var \Illuminate\Support\Collection<int, ArticleSegment> $segments */
+        $segments = $article->relationLoaded('segments')
+            ? $article->segments
+            : $article->segments()
+                ->orderBy('paragraph_index')
+                ->orderBy('sentence_index')
+                ->get();
+
+        return $segments
+            ->filter(fn (ArticleSegment $segment) => filled($segment->content_en))
+            ->map(function (ArticleSegment $segment) {
+                $transcript = trim((string) preg_replace('/\s+/u', ' ', $segment->content_en));
+                $wordCount = $this->processor->countWords($transcript);
+                $startTime = $segment->start_time;
+                $endTime = $segment->end_time;
+                $duration = null;
+
+                if ($startTime !== null && $endTime !== null && $endTime > $startTime) {
+                    $duration = round($endTime - $startTime, 2);
+                }
+
+                return [
+                    'id' => 'segment-'.$segment->getKey(),
+                    'title' => 'Paragraph '.$segment->paragraph_index,
+                    'transcript' => $transcript,
+                    'word_count' => $wordCount,
+                    'paragraph_index' => $segment->paragraph_index,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                    'duration_hint_seconds' => $duration !== null
+                        ? max(4, (int) round($duration))
+                        : max(4, (int) round($wordCount / 2.6)),
+                    'time_range_label' => $duration !== null
+                        ? $this->formatTimeRange($startTime, $endTime)
+                        : null,
+                ];
+            })
+            ->filter(fn (array $clip) => $clip['word_count'] > 0)
+            ->values()
+            ->all();
     }
 
     protected function buildShadowingChunks(string $content): array
@@ -209,6 +258,20 @@ class SpeakingExerciseService
             ->pluck('transcript')
             ->map(fn (string $text) => trim($text))
             ->implode(' '));
+    }
+
+    protected function formatTimeRange(float $startTime, float $endTime): string
+    {
+        return $this->formatSeconds($startTime).' - '.$this->formatSeconds($endTime);
+    }
+
+    protected function formatSeconds(float $seconds): string
+    {
+        $rounded = max(0, (int) round($seconds));
+        $minutes = intdiv($rounded, 60);
+        $remainingSeconds = $rounded % 60;
+
+        return sprintf('%02d:%02d', $minutes, $remainingSeconds);
     }
 
     protected function sampleEvenly(array $items, int $maxItems): array

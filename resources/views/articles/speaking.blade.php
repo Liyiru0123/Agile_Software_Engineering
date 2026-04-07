@@ -19,16 +19,16 @@
                     <div class="flex flex-wrap items-center gap-3 mb-4">
                         <span class="px-3 py-1 rounded-full bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs font-semibold">{{ $difficultyLabel }}</span>
                         <span class="px-3 py-1 rounded-full bg-[#C9A961]/15 text-[#6B3D2E] text-xs font-semibold">{{ number_format($article->word_count) }} words</span>
-                        <span class="px-3 py-1 rounded-full bg-[#4A2C2A]/10 text-[#4A2C2A] text-xs font-semibold">{{ count($shadowingClips) }} short clips</span>
+                        <span class="px-3 py-1 rounded-full bg-[#4A2C2A]/10 text-[#4A2C2A] text-xs font-semibold">{{ count($shadowingClips) }} paragraph clips</span>
                     </div>
                     <h1 class="text-3xl font-bold text-[#4A2C2A] mb-3">{{ $article->title }}</h1>
-                    <p class="text-[#6B3D2E] leading-7">Speaking now supports short shadowing clips and longer open-response prompts. The short clips are replayed from the full article audio as focused segments so learners do not need to scrub through one long file every time.</p>
+                    <p class="text-[#6B3D2E] leading-7">Speaking now supports paragraph-level shadowing clips and longer open-response prompts. Each paragraph clip jumps to its own audio window, so learners do not need to scrub through one long file every time.</p>
                 </div>
 
                 @if($audioUrl)
                     <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
                         <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Source Audio</h2>
-                        <p class="text-[#6B3D2E] leading-6 mb-4">Use the full player for overview listening. Use the short clip cards below for focused follow-and-repeat practice.</p>
+                        <p class="text-[#6B3D2E] leading-6 mb-4">Use the full player for overview listening. Use the paragraph clip cards below for focused follow-and-repeat practice.</p>
                         <audio id="full-article-audio" controls preload="metadata" class="w-full">
                             <source src="{{ $audioUrl }}">
                         </audio>
@@ -39,8 +39,8 @@
                 @endif
 
                 <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
-                    <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Short Shadowing Clips</h2>
-                    <p class="text-[#6B3D2E] leading-6 mb-6">Repeat one short clip at a time. Scoring focuses on accuracy, fluency, and pronunciation.</p>
+                    <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Paragraph Shadowing Clips</h2>
+                    <p class="text-[#6B3D2E] leading-6 mb-6">Repeat one paragraph clip at a time. Scoring focuses on accuracy, fluency, and pronunciation.</p>
 
                     <div class="space-y-4">
                         @forelse($shadowingClips as $clip)
@@ -48,7 +48,12 @@
                                 <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
                                     <div>
                                         <div class="text-xs font-semibold uppercase tracking-[0.15em] text-[#6B3D2E] mb-2">{{ $clip['title'] }}</div>
-                                        <div class="text-sm text-[#8A654E]">{{ $clip['word_count'] }} words | about {{ $clip['duration_hint_seconds'] }}s</div>
+                                        <div class="text-sm text-[#8A654E]">
+                                            {{ $clip['word_count'] }} words | about {{ $clip['duration_hint_seconds'] }}s
+                                            @if(!empty($clip['time_range_label']))
+                                                | {{ $clip['time_range_label'] }}
+                                            @endif
+                                        </div>
                                     </div>
                                     <button type="button" class="play-shadowing-clip px-4 py-2 rounded-2xl bg-[#4A2C2A] text-white text-sm font-semibold" data-clip-id="{{ $clip['id'] }}">Play Clip</button>
                                 </div>
@@ -58,7 +63,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-8 text-center text-[#6B3D2E]">No short shadowing clips are available for this article yet.</div>
+                            <div class="rounded-3xl bg-[#FBF7F1] border border-[#EEE2D4] p-8 text-center text-[#6B3D2E]">No paragraph shadowing clips are available for this article yet.</div>
                         @endforelse
                     </div>
                 </div>
@@ -200,6 +205,7 @@ let timerInterval = null;
 let currentBlob = null;
 let currentClipEndTime = null;
 let currentPreviewUrl = null;
+let currentPlayingClipId = null;
 let selectedExerciseId = @json($firstExercise?->id);
 let selectedClipId = @json($firstShadowingClip['id'] ?? null);
 let activePracticeMode = selectedClipId ? 'shadowing' : 'open_response';
@@ -362,8 +368,29 @@ function stopClipPlayback() {
     if (!clipPlayer) {
         return;
     }
+
     clipPlayer.pause();
     currentClipEndTime = null;
+    currentPlayingClipId = null;
+    resetShadowingPlayButtons();
+}
+
+function setShadowingButtonState(clipId, isPlaying) {
+    document.querySelectorAll('.play-shadowing-clip').forEach((button) => {
+        const matches = button.dataset.clipId === clipId;
+        button.textContent = matches && isPlaying ? 'Pause Clip' : 'Play Clip';
+        button.classList.toggle('bg-[#8B4D3A]', matches && isPlaying);
+        button.classList.toggle('hover:bg-[#A45B45]', matches && isPlaying);
+        button.classList.toggle('bg-[#4A2C2A]', !matches || !isPlaying);
+    });
+}
+
+function resetShadowingPlayButtons() {
+    document.querySelectorAll('.play-shadowing-clip').forEach((button) => {
+        button.textContent = 'Play Clip';
+        button.classList.remove('bg-[#8B4D3A]', 'hover:bg-[#A45B45]');
+        button.classList.add('bg-[#4A2C2A]');
+    });
 }
 
 async function playShadowingClip(clipId) {
@@ -374,15 +401,37 @@ async function playShadowingClip(clipId) {
 
     try {
         await ensureClipPlayerReady();
+        const isSameClip = currentPlayingClipId === clipId;
+
+        if (isSameClip && !clipPlayer.paused) {
+            clipPlayer.pause();
+            currentPlayingClipId = clipId;
+            setShadowingButtonState(clipId, false);
+            return;
+        }
+
         const duration = clipPlayer.duration;
-        const startTime = Math.max(0, Math.min(duration - 1, duration * Number(clip.start_ratio || 0)));
-        const endTime = Math.max(startTime + 1.2, Math.min(duration, duration * Number(clip.end_ratio || 0)));
+        const hasAbsoluteRange = Number.isFinite(Number(clip.start_time)) && Number.isFinite(Number(clip.end_time));
+        const startTime = hasAbsoluteRange
+            ? Math.max(0, Math.min(duration - 1, Number(clip.start_time)))
+            : Math.max(0, Math.min(duration - 1, duration * Number(clip.start_ratio || 0)));
+        const endTime = hasAbsoluteRange
+            ? Math.max(startTime + 1.2, Math.min(duration, Number(clip.end_time)))
+            : Math.max(startTime + 1.2, Math.min(duration, duration * Number(clip.end_ratio || 0)));
+
+        if (!isSameClip || clipPlayer.currentTime < startTime || clipPlayer.currentTime >= endTime) {
+            clipPlayer.currentTime = startTime;
+        }
+
         currentClipEndTime = endTime;
-        clipPlayer.currentTime = startTime;
+        currentPlayingClipId = clipId;
+        setShadowingButtonState(clipId, true);
         await clipPlayer.play();
     } catch (error) {
         console.error('Clip playback error:', error);
-        showSubmissionMessage('The short clip could not be played. Please use the full audio player above.', 'error');
+        currentPlayingClipId = null;
+        resetShadowingPlayButtons();
+        showSubmissionMessage('The paragraph clip could not be played. Please use the full audio player above.', 'error');
     }
 }
 
@@ -561,8 +610,18 @@ if (clipPlayer) {
             stopClipPlayback();
         }
     });
+    clipPlayer.addEventListener('pause', () => {
+        if (currentPlayingClipId && currentClipEndTime !== null && clipPlayer.currentTime < currentClipEndTime) {
+            setShadowingButtonState(currentPlayingClipId, false);
+        }
+    });
+    clipPlayer.addEventListener('play', () => {
+        if (currentPlayingClipId) {
+            setShadowingButtonState(currentPlayingClipId, true);
+        }
+    });
     clipPlayer.addEventListener('ended', () => {
-        currentClipEndTime = null;
+        stopClipPlayback();
     });
 }
 

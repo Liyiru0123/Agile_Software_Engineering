@@ -21,6 +21,7 @@ use App\Models\FriendRequest;
 use App\Models\ForumPost;
 use App\Models\ReadingHistory;
 use App\Models\SelectionFavorite;
+use App\Models\Submission;
 use App\Models\UserPlan;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -568,4 +569,3 @@ Route::get('/register', function () {
 })->name('register')->middleware('guest');
 
 Route::post('/register', [RegisterController::class, 'register'])->name('register.post');
-

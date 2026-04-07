@@ -58,18 +58,14 @@ class ArticleTextProcessor
         $segments = [];
 
         foreach ($paragraphs as $paragraphIndex => $paragraph) {
-            $sentences = $this->splitSentences($paragraph);
-
-            foreach ($sentences as $sentenceIndex => $sentence) {
-                $segments[] = [
-                    'paragraph_index' => $paragraphIndex,
-                    'sentence_index' => $sentenceIndex,
-                    'content_en' => $sentence,
-                    'content_cn' => null,
-                    'start_time' => null,
-                    'end_time' => null,
-                ];
-            }
+            $segments[] = [
+                'paragraph_index' => $paragraphIndex + 1,
+                'sentence_index' => 0,
+                'content_en' => $paragraph,
+                'content_cn' => null,
+                'start_time' => null,
+                'end_time' => null,
+            ];
         }
 
         return $segments;
@@ -228,5 +224,4 @@ class ArticleTextProcessor
             || preg_match('/^[a-z](?:\.[a-z])+$/', $token) === 1;
     }
 }
-
 
