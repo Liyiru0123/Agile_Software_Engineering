@@ -16,11 +16,18 @@ class ForumComment extends Model
         'user_id',
         'forum_post_id',
         'reply_to_comment_id',
+        'is_pinned',
+        'pinned_at',
         'body',
         'attachment_path',
         'attachment_original_name',
         'attachment_mime_type',
         'attachment_size',
+    ];
+
+    protected $casts = [
+        'is_pinned' => 'boolean',
+        'pinned_at' => 'datetime',
     ];
 
     protected static function booted(): void

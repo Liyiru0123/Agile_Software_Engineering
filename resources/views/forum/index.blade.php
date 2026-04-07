@@ -76,11 +76,15 @@
                                     </a>
 
                                     @if(($tag->slug ?? null) !== 'public-forum' && (auth()->user()->is_admin || auth()->id() === $tag->user_id))
-                                        <form method="POST" action="{{ route('forum.tags.destroy', $tag) }}" onsubmit="return confirm('Delete this tag? Posts under it will move to Public Forum.');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-xs font-semibold text-red-600 hover:text-red-700">Delete</button>
-                                        </form>
+                                        @include('forum.partials.inline-delete', [
+                                            'id' => 'delete-tag-'.$tag->id,
+                                            'action' => route('forum.tags.destroy', $tag),
+                                            'message' => 'Delete this tag? Posts under it will be moved to Public Forum.',
+                                            'buttonText' => 'Delete',
+                                            'confirmText' => 'Delete Tag',
+                                            'summaryClass' => 'text-xs font-semibold text-red-600 transition hover:text-red-700 list-none cursor-pointer',
+                                            'panelClass' => 'absolute right-0 top-full z-20 mt-3 w-[min(22rem,calc(100vw-2rem))] rounded-[1.5rem] border border-[#E6D3BC] bg-white p-4 shadow-xl',
+                                        ])
                                     @endif
                                 </div>
                             </div>
@@ -217,6 +221,11 @@
                                         <span class="rounded-full bg-[#FBF7F1] px-3 py-1 text-xs font-semibold text-[#8B6B47]">
                                             {{ $post->favorites_count }} saves
                                         </span>
+                                        @if($post->is_pinned)
+                                            <span class="rounded-full bg-[#4A2C2A] px-3 py-1 text-xs font-semibold text-white">
+                                                Pinned
+                                            </span>
+                                        @endif
                                         @if(($post->attachments_count ?? 0) > 0 || $post->hasLegacyAttachment())
                                             <span class="rounded-full bg-[#FBF7F1] px-3 py-1 text-xs font-semibold text-[#8B6B47]">
                                                 Photos
@@ -229,6 +238,14 @@
                                     </a>
                                     <p class="forum-preview-clamp mt-3 leading-7 text-[#6B3D2E]">{!! $post->highlighted_excerpt !!}</p>
                                     <div class="mt-4 flex flex-wrap items-center gap-3">
+                                        @if($post->can_pin ?? false)
+                                            <form method="POST" action="{{ route('forum.posts.pin', $post) }}">
+                                                @csrf
+                                                <button type="submit" class="rounded-full border px-4 py-2 text-xs font-semibold transition {{ $post->is_pinned ? 'border-[#4A2C2A] bg-[#F3E7D8] text-[#6B3D2E]' : 'border-[#D9C7B5] bg-[#FBF7F1] text-[#6B3D2E] hover:border-[#C9A961]' }}">
+                                                    {{ $post->is_pinned ? 'Unpin' : 'Pin' }}
+                                                </button>
+                                            </form>
+                                        @endif
                                         <form method="POST" action="{{ route('forum.posts.like', $post) }}">
                                             @csrf
                                             <button type="submit" class="rounded-full border px-4 py-2 text-xs font-semibold transition {{ $post->liked_by_user ? 'border-[#4A2C2A] bg-[#4A2C2A] text-white' : 'border-[#D9C7B5] bg-[#FBF7F1] text-[#6B3D2E] hover:border-[#C9A961]' }}">
@@ -252,13 +269,14 @@
                                 </div>
 
                                 @if(auth()->user()->is_admin || auth()->id() === $post->user_id)
-                                    <form method="POST" action="{{ route('forum.posts.destroy', $post) }}" onsubmit="return confirm('Delete this post and all its comments?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50">
-                                            Delete
-                                        </button>
-                                    </form>
+                                    @include('forum.partials.inline-delete', [
+                                        'id' => 'delete-post-'.$post->id,
+                                        'action' => route('forum.posts.destroy', $post),
+                                        'message' => 'Delete this post and all its comments?',
+                                        'buttonText' => 'Delete',
+                                        'confirmText' => 'Delete Post',
+                                        'summaryClass' => 'rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 list-none cursor-pointer',
+                                    ])
                                 @endif
                             </div>
                         </article>

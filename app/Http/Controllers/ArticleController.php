@@ -17,6 +17,7 @@ use App\Services\SpeakingExerciseService;
 use App\WritingExerciseService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -78,7 +79,11 @@ class ArticleController extends Controller
         $this->recordHistory($article, 'speaking');
 
         $data = $this->buildPageData($article);
-        $exercises = $article->exercises()->where('type', 'speaking')->get();
+        $exercises = $article->exercises()
+            ->where('type', 'speaking')
+            ->get()
+            ->reject(fn (Exercise $exercise) => data_get($exercise->question_data, 'mode') === 'shadowing')
+            ->values();
         $data['speakingExercises'] = $exercises;
         $data['shadowingClips'] = filled($data['audioUrl'])
             ? $this->speakingExerciseService->buildShadowingClips($article)
@@ -89,31 +94,32 @@ class ArticleController extends Controller
 
     public function submitSpeaking(Request $request, Article $article)
     {
-        $request->validate([
+        $payload = $request->validate([
+            'practice_mode' => ['sometimes', 'string', Rule::in(['open_response', 'shadowing'])],
             'exercise_id' => [
-                'required',
+                Rule::requiredIf(fn () => $request->input('practice_mode', 'open_response') !== 'shadowing'),
+                'nullable',
                 Rule::exists('exercises', 'id')
                     ->where('article_id', $article->id)
                     ->where('type', 'speaking'),
             ],
             'audio' => 'required|file|mimes:webm,wav,mp3,m4a,ogg|max:10240',
             'page_opened_at' => 'sometimes|integer|min:1',
+            'shadowing_clip_id' => [
+                Rule::requiredIf(fn () => $request->input('practice_mode', 'open_response') === 'shadowing'),
+                'nullable',
+                'string',
+            ],
         ]);
 
-        $exercise = Exercise::findOrFail($request->exercise_id);
-
-        // Save the uploaded recording for later review.
-        $path = $request->file('audio')->store('submissions/speaking', 'public');
-
-        $instructions = $exercise->question_data['instruction']
-            ?? ($exercise->question_data['topic'] ?? 'No specific instruction.');
-        $practiceMode = (string) $request->input('practice_mode', 'open_response');
+        $practiceMode = (string) ($payload['practice_mode'] ?? 'open_response');
+        $exercise = null;
         $shadowingClip = null;
 
-        if ($practiceMode === 'shadowing' && $request->filled('shadowing_clip_id')) {
+        if ($practiceMode === 'shadowing') {
             $shadowingClip = $this->speakingExerciseService->findShadowingClip(
                 $article,
-                (string) $request->input('shadowing_clip_id')
+                (string) ($payload['shadowing_clip_id'] ?? '')
             );
 
             if (! $shadowingClip) {
@@ -122,6 +128,8 @@ class ArticleController extends Controller
                     'message' => 'The selected shadowing clip could not be found.',
                 ], 422);
             }
+        } else {
+            $exercise = Exercise::findOrFail($payload['exercise_id']);
         }
 
         $taskContext = $shadowingClip
@@ -133,70 +141,86 @@ class ArticleController extends Controller
             ]
             : [
                 'mode' => 'open_response',
-                'instruction' => $instructions,
+                'instruction' => $exercise->question_data['instruction']
+                    ?? ($exercise->question_data['topic'] ?? 'No specific instruction.'),
                 'title' => (string) ($exercise->question_data['title'] ?? 'Speaking Task'),
             ];
+        $exercise ??= $this->resolveShadowingExercise($article);
 
         $provider = strtolower((string) config('services.speaking.provider', 'gemini'));
+        $path = null;
 
-        $evaluation = match ($provider) {
-            'qwen_omni' => $this->qwenOmniAudioService->evaluateAudio(
-                $request->file('audio'),
-                $taskContext['instruction'],
-                Str::limit($article->content, 5000)
-            ),
-            'ollama' => $this->ollamaSpeakingService->evaluateSpeaking(
-                $request->file('audio'),
-                $taskContext['instruction'],
-                Str::limit($article->content, 3000)
-            ),
-            default => $this->geminiAudioService->evaluateAudio(
-                $request->file('audio'),
-                $taskContext,
-                Str::limit($article->content, 5000)
-            ),
-        };
+        try {
+            // Save the uploaded recording for later review.
+            $path = $request->file('audio')->store('submissions/speaking', 'public');
 
-        $evaluation['provider'] = $provider;
-        $evaluation['practice_mode'] = $taskContext['mode'];
-        $evaluation['task_title'] = $taskContext['title'];
+            $evaluation = match ($provider) {
+                'qwen_omni' => $this->qwenOmniAudioService->evaluateAudio(
+                    $request->file('audio'),
+                    $taskContext['instruction'],
+                    Str::limit($article->content, 5000)
+                ),
+                'ollama' => $this->ollamaSpeakingService->evaluateSpeaking(
+                    $request->file('audio'),
+                    $taskContext['instruction'],
+                    Str::limit($article->content, 3000)
+                ),
+                default => $this->geminiAudioService->evaluateAudio(
+                    $request->file('audio'),
+                    $taskContext,
+                    Str::limit($article->content, 5000)
+                ),
+            };
 
-        if ($shadowingClip) {
-            $evaluation['target_text'] = $shadowingClip['transcript'];
-            $evaluation['clip_id'] = $shadowingClip['id'];
+            $evaluation['provider'] = $provider;
+            $evaluation['practice_mode'] = $taskContext['mode'];
+            $evaluation['task_title'] = $taskContext['title'];
+
+            if ($shadowingClip) {
+                $evaluation['target_text'] = $shadowingClip['transcript'];
+                $evaluation['clip_id'] = $shadowingClip['id'];
+            }
+
+            if (isset($evaluation['error'])) {
+                Storage::disk('public')->delete($path);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $evaluation['error'],
+                    'evaluation' => $evaluation,
+                ], 422);
+            }
+
+            $timeSpent = 0;
+            if ($request->filled('page_opened_at')) {
+                $openedAtMs = (int) $request->input('page_opened_at');
+                $nowMs = now()->valueOf();
+                $timeSpent = max(0, (int) floor(($nowMs - $openedAtMs) / 1000));
+            }
+
+            $submission = Submission::create([
+                'user_id' => auth()->id(),
+                'exercise_id' => $exercise->id,
+                'article_id' => $article->id,
+                'user_answer' => [
+                    'audio_path' => $path,
+                    'transcript' => $evaluation['transcript'] ?? null,
+                    'practice_mode' => $taskContext['mode'],
+                    'shadowing_clip_id' => $shadowingClip['id'] ?? null,
+                    'target_text' => $shadowingClip['transcript'] ?? null,
+                ],
+                'score' => $evaluation['score'] ?? 0,
+                'time_spent' => $timeSpent,
+                'ai_advice' => $evaluation,
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $exception) {
+            if ($path) {
+                Storage::disk('public')->delete($path);
+            }
+
+            throw $exception;
         }
-
-        if (isset($evaluation['error'])) {
-            return response()->json([
-                'success' => false,
-                'message' => $evaluation['error'],
-                'evaluation' => $evaluation,
-            ], 422);
-        }
-
-        $timeSpent = 0;
-        if ($request->filled('page_opened_at')) {
-            $openedAtMs = (int) $request->input('page_opened_at');
-            $nowMs = now()->valueOf();
-            $timeSpent = max(0, (int) floor(($nowMs - $openedAtMs) / 1000));
-        }
-
-        $submission = Submission::create([
-            'user_id' => auth()->id(),
-            'exercise_id' => $exercise->id,
-            'article_id' => $article->id,
-            'user_answer' => [
-                'audio_path' => $path,
-                'transcript' => $evaluation['transcript'] ?? null,
-                'practice_mode' => $taskContext['mode'],
-                'shadowing_clip_id' => $shadowingClip['id'] ?? null,
-                'target_text' => $shadowingClip['transcript'] ?? null,
-            ],
-            'score' => $evaluation['score'] ?? 0,
-            'time_spent' => $timeSpent,
-            'ai_advice' => $evaluation,
-            'created_at' => now(),
-        ]);
 
         $reward = null;
         if ($request->user()) {
@@ -268,11 +292,25 @@ class ArticleController extends Controller
                 'cta' => 'Start listening',
             ],
             [
+                'title' => 'Reading',
+                'description' => 'Answer comprehension questions with inline explanations, source locating, and article-side navigation.',
+                'status' => 'Questions ready',
+                'route' => route('articles.reading', $article),
+                'cta' => 'Start reading',
+            ],
+            [
                 'title' => 'Speaking',
                 'description' => 'Retell the article, express your opinion, and do shadowing practice with in-browser recording support.',
                 'status' => 'Practice prompts ready',
                 'route' => route('articles.speaking', $article),
                 'cta' => 'Start speaking',
+            ],
+            [
+                'title' => 'Writing',
+                'description' => 'Practice summary, paraphrase, and opinion writing with saved drafts and AI-based feedback.',
+                'status' => 'Tasks ready',
+                'route' => route('articles.writing', $article),
+                'cta' => 'Start writing',
             ],
         ];
     }
@@ -355,6 +393,29 @@ class ArticleController extends Controller
             ->all();
     }
 
+    protected function resolveShadowingExercise(Article $article): Exercise
+    {
+        $existing = $article->exercises()
+            ->where('type', 'speaking')
+            ->get()
+            ->first(fn (Exercise $exercise) => data_get($exercise->question_data, 'mode') === 'shadowing');
+
+        if ($existing) {
+            return $existing;
+        }
+
+        return Exercise::query()->create([
+            'article_id' => $article->id,
+            'type' => 'speaking',
+            'question_data' => [
+                'mode' => 'shadowing',
+                'title' => 'Shadowing Practice',
+                'instruction' => 'Repeat the selected target excerpt as accurately and naturally as possible.',
+            ],
+            'answer' => [],
+        ]);
+    }
+
     protected function resolveAudioUrl(?string $audioUrl): ?string
     {
         if (! filled($audioUrl)) {
@@ -398,7 +459,3 @@ class ArticleController extends Controller
         $history->save();
     }
 }
-
-
-
-

@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FriendRequest;
+use App\Models\Friendship;
 use App\Models\ForumComment;
 use App\Models\ForumCommentAttachment;
+use App\Models\ForumNotification;
 use App\Models\ForumPost;
 use App\Models\ForumPostAttachment;
 use App\Models\ForumTag;
@@ -77,7 +80,7 @@ class ForumController extends Controller
         }
 
         $posts = ForumPost::query()
-            ->with(['user:id,name,is_admin', 'tag:id,name,slug'])
+            ->with(['user:id,name,is_admin', 'tag:id,name,slug,user_id'])
             ->withCount(['comments', 'likes', 'favorites', 'attachments'])
             ->when($timeframe !== 'all', fn ($query) => $this->applyTimeframe($query, $timeframe))
             ->when($selectedTagIds->isNotEmpty(), fn ($query) => $this->applyTagFilter($query, $selectedTagIds->all(), $publicTag->id))
@@ -92,6 +95,10 @@ class ForumController extends Controller
                         ->orWhere('body', 'like', '%'.$search.'%');
                 });
             });
+
+        $posts
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('pinned_at');
 
         match ($sort) {
             'oldest' => $posts->oldest(),
@@ -110,9 +117,11 @@ class ForumController extends Controller
         $this->decoratePostsForDisplay($posts->getCollection(), $search);
 
         $topLikedPosts = ForumPost::query()
-            ->with(['user:id,name', 'tag:id,name,slug'])
+            ->with(['user:id,name', 'tag:id,name,slug,user_id'])
             ->withCount(['likes', 'comments', 'favorites', 'attachments'])
             ->when($timeframe !== 'all', fn ($query) => $this->applyTimeframe($query, $timeframe))
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('pinned_at')
             ->orderByDesc('likes_count')
             ->orderByDesc('comments_count')
             ->orderByDesc('view_count')
@@ -120,9 +129,11 @@ class ForumController extends Controller
             ->get();
 
         $trendingPosts = ForumPost::query()
-            ->with(['user:id,name', 'tag:id,name,slug'])
+            ->with(['user:id,name', 'tag:id,name,slug,user_id'])
             ->withCount(['likes', 'comments', 'favorites', 'attachments'])
             ->when($timeframe !== 'all', fn ($query) => $this->applyTimeframe($query, $timeframe))
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('pinned_at')
             ->orderByDesc('comments_count')
             ->orderByDesc('likes_count')
             ->orderByDesc('view_count')
@@ -154,6 +165,8 @@ class ForumController extends Controller
     {
         $post->increment('view_count');
 
+        $this->markRelevantForumNotificationsAsRead($request, $post);
+
         $publicTag = $this->ensurePublicForumTag($request->user());
         $tags = $this->forumTagsQuery()->get(['id', 'name', 'slug']);
         $commentSort = $request->string('comments')->toString() === 'latest' ? 'latest' : 'oldest';
@@ -170,7 +183,7 @@ class ForumController extends Controller
         $post = $post->fresh()
             ->load([
                 'user:id,name,is_admin',
-                'tag:id,name,slug',
+                'tag:id,name,slug,user_id',
                 'attachments',
             ])
             ->loadCount(['comments', 'likes', 'favorites', 'attachments']);
@@ -180,13 +193,26 @@ class ForumController extends Controller
             ->where('forum_post_id', $post->id)
             ->when($commentFilter === 'author', fn ($query) => $query->where('user_id', $post->user_id))
             ->when($commentFilter === 'mine', fn ($query) => $query->where('user_id', $request->user()->id))
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('pinned_at')
             ->when($commentSort === 'latest', fn ($query) => $query->latest(), fn ($query) => $query->oldest())
             ->paginate(self::COMMENTS_PER_PAGE)
             ->withQueryString();
 
         $this->attachReactionStateToPost($post, $request->user());
+        $post->can_pin = $this->canPinPost($request->user(), $post);
+        $comments->getCollection()->transform(function (ForumComment $comment) use ($request, $post) {
+            $comment->can_pin = $this->canPinComment($request->user(), $post);
 
-        return view('forum.show', compact('post', 'tags', 'publicTag', 'commentSort', 'commentFilter', 'replyToComment', 'comments'));
+            return $comment;
+        });
+
+        $socialTargetStates = $this->buildSocialTargetStates(
+            $request->user()->id,
+            collect([$post->user_id])->merge($comments->getCollection()->pluck('user_id'))
+        );
+
+        return view('forum.show', compact('post', 'tags', 'publicTag', 'commentSort', 'commentFilter', 'replyToComment', 'comments', 'socialTargetStates'));
     }
 
     public function saved(Request $request): View
@@ -210,7 +236,7 @@ class ForumController extends Controller
 
         $posts = $request->user()
             ->favoritedForumPosts()
-            ->with(['user:id,name,is_admin', 'tag:id,name,slug'])
+            ->with(['user:id,name,is_admin', 'tag:id,name,slug,user_id'])
             ->withCount(['comments', 'likes', 'favorites', 'attachments'])
             ->when($selectedTagIds->isNotEmpty(), fn ($query) => $query->whereIn('forum_tag_id', $selectedTagIds->all()))
             ->when($search !== '', function ($query) use ($search) {
@@ -220,6 +246,10 @@ class ForumController extends Controller
                         ->orWhere('body', 'like', '%'.$search.'%');
                 });
             });
+
+        $posts
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('pinned_at');
 
         match ($sort) {
             'saved_oldest' => $posts->orderBy('forum_post_favorites.created_at'),
@@ -241,6 +271,89 @@ class ForumController extends Controller
             'selectedTagIds' => $selectedTagIds->all(),
             'search' => $search,
             'sort' => $sort,
+        ]);
+    }
+
+    public function myForum(Request $request): View
+    {
+        $user = $request->user();
+        $unreadPostCounts = ForumNotification::query()
+            ->where('user_id', $user->id)
+            ->where('type', 'post_commented')
+            ->whereNull('read_at')
+            ->selectRaw('forum_post_id, COUNT(*) as unread_count')
+            ->groupBy('forum_post_id')
+            ->pluck('unread_count', 'forum_post_id');
+
+        $unreadCommentCounts = ForumNotification::query()
+            ->where('user_id', $user->id)
+            ->where('type', 'comment_replied')
+            ->whereNull('read_at')
+            ->whereNotNull('target_forum_comment_id')
+            ->selectRaw('target_forum_comment_id, COUNT(*) as unread_count')
+            ->groupBy('target_forum_comment_id')
+            ->pluck('unread_count', 'target_forum_comment_id');
+
+        $forumPostsSummary = [
+            'count' => ForumPost::query()
+                ->where('user_id', $user->id)
+                ->count(),
+            'recent' => ForumPost::query()
+                ->with('tag:id,name,slug')
+                ->where('user_id', $user->id)
+                ->latest()
+                ->take(6)
+                ->get()
+                ->map(fn (ForumPost $post) => [
+                    'title' => $post->title,
+                    'tag_name' => $post->tag?->name,
+                    'url' => route('forum.posts.show', ['post' => $post, 'notification_post' => 1]),
+                    'created_at' => optional($post->created_at)?->diffForHumans(),
+                    'unread_count' => (int) ($unreadPostCounts[$post->id] ?? 0),
+                ]),
+        ];
+
+        $forumCommentsSummary = [
+            'count' => ForumComment::query()
+                ->where('user_id', $user->id)
+                ->count(),
+            'recent' => ForumComment::query()
+                ->with('post:id,title')
+                ->where('user_id', $user->id)
+                ->latest()
+                ->take(6)
+                ->get()
+                ->map(fn (ForumComment $comment) => [
+                    'excerpt' => Str::limit($comment->body, 90),
+                    'post_title' => $comment->post?->title ?? 'Forum Post',
+                    'url' => $comment->post
+                        ? route('forum.posts.show', ['post' => $comment->post, 'notification_comment' => $comment->id]).'#comment-'.$comment->id
+                        : route('forum.index'),
+                    'created_at' => optional($comment->created_at)?->diffForHumans(),
+                    'unread_count' => (int) ($unreadCommentCounts[$comment->id] ?? 0),
+                ]),
+        ];
+
+        $forumSavedSummary = [
+            'count' => $user->favoritedForumPosts()->count(),
+            'recent' => $user->favoritedForumPosts()
+                ->with(['tag:id,name,slug', 'user:id,name'])
+                ->latest('forum_post_favorites.created_at')
+                ->take(6)
+                ->get()
+                ->map(fn (ForumPost $post) => [
+                    'title' => $post->title,
+                    'tag_name' => $post->tag?->name,
+                    'author_name' => $post->user?->name ?? 'Unknown',
+                    'url' => route('forum.posts.show', $post),
+                    'saved_at' => optional($post->pivot?->created_at)?->diffForHumans(),
+                ]),
+        ];
+
+        return view('forum.my', [
+            'forumPostsSummary' => $forumPostsSummary,
+            'forumCommentsSummary' => $forumCommentsSummary,
+            'forumSavedSummary' => $forumSavedSummary,
         ]);
     }
 
@@ -407,6 +520,7 @@ class ForumController extends Controller
 
         $comment = ForumComment::query()->create($commentData);
         $this->storeCommentAttachments($comment, $request->file('attachments', []));
+        $this->createNotificationsForComment($comment);
 
         $commentSort = $request->string('comments')->toString() === 'latest' ? 'latest' : 'oldest';
         $commentFilter = $this->normalizeCommentFilter($request->string('comment_filter')->toString());
@@ -500,6 +614,37 @@ class ForumController extends Controller
         return back()->with('forum_status', $message);
     }
 
+    public function togglePostPin(Request $request, ForumPost $post): RedirectResponse
+    {
+        abort_unless($this->canPinPost($request->user(), $post), 403);
+
+        $post->update([
+            'is_pinned' => ! $post->is_pinned,
+            'pinned_at' => $post->is_pinned ? null : now(),
+        ]);
+
+        return back()->with('forum_status', $post->fresh()->is_pinned ? 'Post pinned successfully.' : 'Post unpinned successfully.');
+    }
+
+    public function toggleCommentPin(Request $request, ForumComment $comment): RedirectResponse
+    {
+        $post = $comment->post()->with('tag')->firstOrFail();
+        abort_unless($this->canPinComment($request->user(), $post), 403);
+
+        $comment->update([
+            'is_pinned' => ! $comment->is_pinned,
+            'pinned_at' => $comment->is_pinned ? null : now(),
+        ]);
+
+        $commentSort = $request->string('comments')->toString() === 'latest' ? 'latest' : 'oldest';
+        $commentFilter = $this->normalizeCommentFilter($request->string('comment_filter')->toString());
+        $page = max(1, $request->integer('page', 1));
+
+        return redirect()
+            ->to(route('forum.posts.show', $this->forumShowParameters($post, $commentSort, $page, $commentFilter)).'#comment-'.$comment->id)
+            ->with('forum_status', $comment->fresh()->is_pinned ? 'Comment pinned successfully.' : 'Comment unpinned successfully.');
+    }
+
     protected function canModerateContent($user, int $ownerId): bool
     {
         return (bool) ($user?->is_admin || $user?->id === $ownerId);
@@ -513,6 +658,22 @@ class ForumController extends Controller
     protected function canManageTag($user, ForumTag $tag): bool
     {
         return (bool) ($user?->is_admin || $user?->id === $tag->user_id);
+    }
+
+    protected function canPinPost($user, ForumPost $post): bool
+    {
+        return (bool) (
+            $user?->is_admin
+            || $user?->id === $post->tag?->user_id
+        );
+    }
+
+    protected function canPinComment($user, ForumPost $post): bool
+    {
+        return (bool) (
+            $user?->is_admin
+            || $user?->id === $post->user_id
+        );
     }
 
     protected function excerptWithHighlight(string $text, string $search, int $limit = 220): string
@@ -570,6 +731,7 @@ class ForumController extends Controller
             $posts->each(function (ForumPost $post) {
                 $post->liked_by_user = false;
                 $post->favorited_by_user = false;
+                $post->can_pin = false;
             });
 
             return;
@@ -585,9 +747,10 @@ class ForumController extends Controller
             ->pluck('forum_posts.id')
             ->all();
 
-        $posts->each(function (ForumPost $post) use ($likedIds, $favoritedIds) {
+        $posts->each(function (ForumPost $post) use ($likedIds, $favoritedIds, $user) {
             $post->liked_by_user = in_array($post->id, $likedIds, true);
             $post->favorited_by_user = in_array($post->id, $favoritedIds, true);
+            $post->can_pin = $this->canPinPost($user, $post);
         });
     }
 
@@ -602,6 +765,7 @@ class ForumController extends Controller
 
         $post->liked_by_user = $post->likes()->where('user_id', $user->id)->exists();
         $post->favorited_by_user = $post->favorites()->where('user_id', $user->id)->exists();
+        $post->can_pin = $this->canPinPost($user, $post);
     }
 
     protected function resolveReplyCommentId(?int $replyToCommentId, int $postId): ?int
@@ -615,6 +779,80 @@ class ForumController extends Controller
             ->find($replyToCommentId);
 
         return $replyToComment?->id;
+    }
+
+    protected function createNotificationsForComment(ForumComment $comment): void
+    {
+        $comment->loadMissing([
+            'post:id,user_id,title',
+            'replyParent:id,user_id',
+        ]);
+
+        $recipientTypes = [];
+        $actorId = (int) $comment->user_id;
+        $postOwnerId = (int) ($comment->post?->user_id ?? 0);
+        $replyOwnerId = (int) ($comment->replyParent?->user_id ?? 0);
+        $replyParentId = (int) ($comment->replyParent?->id ?? 0);
+
+        if ($postOwnerId > 0 && $postOwnerId !== $actorId) {
+            $recipientTypes[$postOwnerId] = 'post_commented';
+        }
+
+        if ($replyOwnerId > 0 && $replyOwnerId !== $actorId) {
+            $recipientTypes[$replyOwnerId] = 'comment_replied';
+        }
+
+        foreach ($recipientTypes as $recipientId => $type) {
+            ForumNotification::query()->create([
+                'user_id' => $recipientId,
+                'actor_id' => $actorId,
+                'forum_post_id' => $comment->forum_post_id,
+                'forum_comment_id' => $comment->id,
+                'target_forum_comment_id' => $type === 'comment_replied' ? $replyParentId : null,
+                'type' => $type,
+            ]);
+        }
+    }
+
+    protected function markRelevantForumNotificationsAsRead(Request $request, ForumPost $post): void
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return;
+        }
+
+        if ($request->boolean('notification_post') && (int) $post->user_id === (int) $user->id) {
+            ForumNotification::query()
+                ->where('user_id', $user->id)
+                ->where('forum_post_id', $post->id)
+                ->where('type', 'post_commented')
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        }
+
+        $targetCommentId = $request->integer('notification_comment');
+
+        if ($targetCommentId < 1) {
+            return;
+        }
+
+        $ownsComment = ForumComment::query()
+            ->where('id', $targetCommentId)
+            ->where('forum_post_id', $post->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if (! $ownsComment) {
+            return;
+        }
+
+        ForumNotification::query()
+            ->where('user_id', $user->id)
+            ->where('type', 'comment_replied')
+            ->where('target_forum_comment_id', $targetCommentId)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
     }
 
     protected function decoratePostsForDisplay($posts, string $search): void
@@ -654,6 +892,56 @@ class ForumController extends Controller
     protected function normalizeCommentFilter(string $commentFilter): string
     {
         return in_array($commentFilter, ['all', 'author', 'mine'], true) ? $commentFilter : 'all';
+    }
+
+    protected function buildSocialTargetStates(int $currentUserId, $targetUserIds): array
+    {
+        $ids = collect($targetUserIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->reject(fn (int $id) => $id === $currentUserId)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $friendIds = Friendship::query()
+            ->where(function ($query) use ($currentUserId, $ids) {
+                $query->where('user_one_id', $currentUserId)
+                    ->whereIn('user_two_id', $ids);
+            })
+            ->orWhere(function ($query) use ($currentUserId, $ids) {
+                $query->where('user_two_id', $currentUserId)
+                    ->whereIn('user_one_id', $ids);
+            })
+            ->get()
+            ->map(fn (Friendship $friendship) => $friendship->user_one_id === $currentUserId ? $friendship->user_two_id : $friendship->user_one_id)
+            ->unique()
+            ->values();
+
+        $sentPendingIds = FriendRequest::query()
+            ->where('sender_id', $currentUserId)
+            ->where('status', 'pending')
+            ->whereIn('receiver_id', $ids)
+            ->pluck('receiver_id');
+
+        $receivedPendingIds = FriendRequest::query()
+            ->where('receiver_id', $currentUserId)
+            ->where('status', 'pending')
+            ->whereIn('sender_id', $ids)
+            ->pluck('sender_id');
+
+        return $ids
+            ->mapWithKeys(fn (int $id) => [
+                $id => [
+                    'is_friend' => $friendIds->contains($id),
+                    'pending_sent' => $sentPendingIds->contains($id),
+                    'pending_received' => $receivedPendingIds->contains($id),
+                ],
+            ])
+            ->all();
     }
 
     protected function applyTimeframe($query, string $timeframe)

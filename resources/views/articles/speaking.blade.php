@@ -5,6 +5,7 @@
 @php
     $firstExercise = $speakingExercises->first();
     $firstShadowingClip = $shadowingClips[0] ?? null;
+    $hasRecordableTask = $speakingExercises->isNotEmpty() || !empty($shadowingClips);
 @endphp
 
 @section('content')
@@ -106,12 +107,12 @@
             </section>
 
             <aside class="space-y-6 sticky top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2 training-sidebar-scroll">
-                <div id="recorder-box" class="bg-[#4A2C2A] text-white rounded-3xl p-6 shadow-lg {{ $speakingExercises->isEmpty() ? 'opacity-50 pointer-events-none' : '' }}">
+                <div id="recorder-box" class="bg-[#4A2C2A] text-white rounded-3xl p-6 shadow-lg {{ $hasRecordableTask ? '' : 'opacity-50 pointer-events-none' }}">
                     <div class="flex flex-wrap items-center gap-3 mb-3">
                         <h2 class="text-2xl font-bold">Browser Recorder</h2>
                         <span id="practice-mode-badge" class="px-3 py-1 rounded-full bg-white/10 text-[#F5E6D3] text-xs font-semibold">Open response</span>
                     </div>
-                    <p id="practice-mode-description" class="text-sm text-[#F5E6D3]/80 leading-6 mb-5">Select a task above, then record your response.</p>
+                    <p id="practice-mode-description" class="text-sm text-[#F5E6D3]/80 leading-6 mb-5">{{ $hasRecordableTask ? 'Select a task above, then record your response.' : 'This article does not have a recordable speaking task yet.' }}</p>
                     <div id="selected-task-indicator" class="mb-4 hidden">
                         <span class="text-xs font-semibold uppercase text-[#C9A961]">Selected:</span>
                         <div id="selected-task-title" class="text-sm font-medium mt-1"></div>
@@ -198,12 +199,12 @@ let recordingStartTime = null;
 let timerInterval = null;
 let currentBlob = null;
 let currentClipEndTime = null;
+let currentPreviewUrl = null;
 let selectedExerciseId = @json($firstExercise?->id);
 let selectedClipId = @json($firstShadowingClip['id'] ?? null);
 let activePracticeMode = selectedClipId ? 'shadowing' : 'open_response';
 
 const shadowingClips = @json($shadowingClips);
-const firstExerciseId = @json($firstExercise?->id);
 const pageOpenedAt = Date.now();
 const clipPlayer = document.getElementById('shadowing-audio-player');
 const startSpeaking = document.getElementById('start-speaking');
@@ -220,6 +221,16 @@ const selectedTargetBox = document.getElementById('selected-target-box');
 const submissionMessage = document.getElementById('submission-message');
 const practiceModeBadge = document.getElementById('practice-mode-badge');
 const practiceModeDescription = document.getElementById('practice-mode-description');
+
+function canRecordCurrentTask() {
+    return activePracticeMode === 'shadowing'
+        ? Boolean(selectedClipId)
+        : Boolean(selectedExerciseId);
+}
+
+function syncRecorderAvailability() {
+    startSpeaking.disabled = !canRecordCurrentTask();
+}
 
 function showSubmissionMessage(message, type = 'info') {
     const map = {
@@ -256,7 +267,7 @@ function setRecorderContext(title, mode, targetText = '') {
         selectedTargetBox.classList.add('hidden');
     }
 
-    startSpeaking.disabled = !selectedExerciseId;
+    syncRecorderAvailability();
 }
 
 function highlightSelection() {
@@ -297,9 +308,14 @@ function resetRecorderUI() {
     speakingPreview.classList.add('hidden');
     speakingPreview.removeAttribute('src');
     speakingPreview.load();
+    if (currentPreviewUrl) {
+        URL.revokeObjectURL(currentPreviewUrl);
+        currentPreviewUrl = null;
+    }
     noPreview.classList.remove('hidden');
     currentBlob = null;
     speakingChunks = [];
+    syncRecorderAvailability();
 }
 
 function selectExercise(element) {
@@ -316,10 +332,6 @@ function selectShadowingClip(element) {
     const clip = findClip(element.dataset.clipId);
     if (!clip) {
         return;
-    }
-
-    if (!selectedExerciseId && firstExerciseId) {
-        selectedExerciseId = firstExerciseId;
     }
 
     selectedClipId = clip.id;
@@ -396,7 +408,11 @@ startSpeaking.addEventListener('click', async () => {
 
         speakingRecorder.onstop = () => {
             currentBlob = new Blob(speakingChunks, { type: 'audio/webm' });
-            speakingPreview.src = URL.createObjectURL(currentBlob);
+            if (currentPreviewUrl) {
+                URL.revokeObjectURL(currentPreviewUrl);
+            }
+            currentPreviewUrl = URL.createObjectURL(currentBlob);
+            speakingPreview.src = currentPreviewUrl;
             speakingPreview.classList.remove('hidden');
             noPreview.classList.add('hidden');
             submitRecording.classList.remove('hidden');
@@ -426,7 +442,7 @@ stopSpeaking.addEventListener('click', () => {
 });
 
 submitRecording.addEventListener('click', async () => {
-    if (!currentBlob || !selectedExerciseId) {
+    if (!currentBlob || !canRecordCurrentTask()) {
         return;
     }
 
@@ -436,7 +452,9 @@ submitRecording.addEventListener('click', async () => {
 
     const formData = new FormData();
     formData.append('audio', currentBlob, 'recording.webm');
-    formData.append('exercise_id', String(selectedExerciseId));
+    if (selectedExerciseId) {
+        formData.append('exercise_id', String(selectedExerciseId));
+    }
     formData.append('page_opened_at', String(pageOpenedAt));
     formData.append('practice_mode', activePracticeMode);
 
@@ -519,7 +537,6 @@ submitRecording.addEventListener('click', async () => {
 retrySpeaking.addEventListener('click', () => {
     resetRecorderUI();
     hideSubmissionMessage();
-    startSpeaking.disabled = !selectedExerciseId;
     showSubmissionMessage('Ready. Click "Start Recording" to try again.', 'info');
 });
 
@@ -561,8 +578,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const firstExercise = document.querySelector('.exercise-item');
     if (firstExercise) {
         selectExercise(firstExercise);
+        return;
+    }
+
+    syncRecorderAvailability();
+});
+
+window.addEventListener('beforeunload', () => {
+    if (currentPreviewUrl) {
+        URL.revokeObjectURL(currentPreviewUrl);
     }
 });
 </script>
 @endpush
-
