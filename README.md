@@ -1,28 +1,28 @@
-# 部署说明
+# Deployment Guide
 
-## 1. 拉取代码
+## 1. Clone the repository
 
 ```bash
 git clone https://github.com/Liyiru0123/Agile_Software_Engineering.git
 cd Agile_Software_Engineering
 ```
 
-## 2. 安装依赖
+## 2. Install dependencies
 
 ```bash
 composer install
 ```
 
-## 3. 初始化环境
+## 3. Initialize the environment
 
 ```bash
 copy .env.example .env
 php artisan key:generate
 ```
 
-## 4. 配置数据库
+## 4. Configure the database
 
-编辑 .env：
+Edit `.env`:
 
 ```env
 DB_CONNECTION=mysql
@@ -33,25 +33,31 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
-## 5. 迁移数据库
+## 5. Import the full database structure and seed data
+
+Use one command only:
 
 ```bash
-php artisan migrate
-```
-## 导入数据：
-
-
-```bash
-mysql -u root -p english_learning < database/sql/version3.21/generated_article_exercise_dataset.sql
+php artisan migrate:fresh --seed
 ```
 
-## 7. 启动服务
+This command will:
+
+- create all tables
+- import articles and exercises
+- import vocabulary
+- import admin user data
+- import wordle game words
+
+## 6. Start the application
 
 ```bash
 php artisan config:clear
 php artisan serve
 ```
 
-访问地址：
+Open:
 
+```text
 http://127.0.0.1:8000
+```

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ForumComment;
+use App\Models\ForumNotification;
 use App\Models\ForumPost;
 use App\Models\ForumTag;
 use App\Models\User;
@@ -15,7 +16,7 @@ class ForumFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_create_tags_posts_and_comments_and_see_them_on_dashboard(): void
+    public function test_user_can_create_tags_posts_and_comments_and_see_them_on_my_forum_page(): void
     {
         $user = User::factory()->create();
 
@@ -45,9 +46,9 @@ class ForumFeatureTest extends TestCase
             ->assertSee('How I practice paraphrasing')
             ->assertSee('This method also helps me notice repeated vocabulary.');
 
-        $this->actingAs($user)->get(route('home'))
+        $this->actingAs($user)->get(route('forum.my'))
             ->assertOk()
-            ->assertSee('Forum Activity')
+            ->assertSee('My Forum')
             ->assertSee('How I practice paraphrasing')
             ->assertSee('This method also helps me notice repeated vocabulary.');
     }
@@ -573,7 +574,7 @@ class ForumFeatureTest extends TestCase
             ->assertDontSeeText('Comment page 01');
     }
 
-    public function test_saved_forum_posts_are_visible_on_dashboard(): void
+    public function test_saved_forum_posts_are_visible_on_my_forum_page(): void
     {
         $user = User::factory()->create();
         $author = User::factory()->create();
@@ -588,7 +589,7 @@ class ForumFeatureTest extends TestCase
             ->assertRedirect();
 
         $this->actingAs($user)
-            ->get(route('home'))
+            ->get(route('forum.my'))
             ->assertOk()
             ->assertSee('Saved Forum Posts')
             ->assertSee('Saved dashboard post');
@@ -883,5 +884,246 @@ class ForumFeatureTest extends TestCase
         foreach ($comment->attachments as $attachment) {
             Storage::disk('public')->assertMissing($attachment->path);
         }
+    }
+
+    public function test_tag_owner_can_pin_post_and_pinned_post_appears_first(): void
+    {
+        $tagOwner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $tag = ForumTag::query()->create([
+            'user_id' => $tagOwner->id,
+            'name' => 'Pinned Writing',
+            'slug' => 'pinned-writing',
+        ]);
+
+        $unpinnedPost = ForumPost::query()->create([
+            'user_id' => $otherUser->id,
+            'forum_tag_id' => $tag->id,
+            'title' => 'Regular post',
+            'body' => 'This post should appear after the pinned post.',
+        ]);
+
+        $pinnedPost = ForumPost::query()->create([
+            'user_id' => $otherUser->id,
+            'forum_tag_id' => $tag->id,
+            'title' => 'Pinned candidate',
+            'body' => 'This post should move to the top after pinning.',
+        ]);
+
+        $this->actingAs($tagOwner)
+            ->post(route('forum.posts.pin', $pinnedPost))
+            ->assertRedirect();
+
+        $this->assertTrue($pinnedPost->fresh()->is_pinned);
+
+        $this->actingAs($tagOwner)
+            ->get(route('forum.index', ['tag' => $tag->slug]))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Pinned candidate',
+                'Regular post',
+            ])
+            ->assertSee('Pinned');
+
+        $this->assertFalse($unpinnedPost->fresh()->is_pinned);
+    }
+
+    public function test_non_tag_owner_cannot_pin_post(): void
+    {
+        $tagOwner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $tag = ForumTag::query()->create([
+            'user_id' => $tagOwner->id,
+            'name' => 'Authorization Tag',
+            'slug' => 'authorization-tag',
+        ]);
+
+        $post = ForumPost::query()->create([
+            'user_id' => $tagOwner->id,
+            'forum_tag_id' => $tag->id,
+            'title' => 'Protected pin post',
+            'body' => 'Only the tag owner or an admin may pin this post.',
+        ]);
+
+        $this->actingAs($otherUser)
+            ->post(route('forum.posts.pin', $post))
+            ->assertForbidden();
+
+        $this->assertFalse($post->fresh()->is_pinned);
+    }
+
+    public function test_post_owner_can_pin_comment_and_pinned_comment_appears_first(): void
+    {
+        $postOwner = User::factory()->create();
+        $commentAuthor = User::factory()->create();
+        $post = ForumPost::query()->create([
+            'user_id' => $postOwner->id,
+            'title' => 'Comment pin permissions',
+            'body' => 'The post owner should be able to pin comments here.',
+        ]);
+
+        $regularComment = ForumComment::query()->create([
+            'user_id' => $commentAuthor->id,
+            'forum_post_id' => $post->id,
+            'body' => 'Regular comment that should stay below the pinned one.',
+        ]);
+
+        $pinnedComment = ForumComment::query()->create([
+            'user_id' => $commentAuthor->id,
+            'forum_post_id' => $post->id,
+            'body' => 'Pinned comment that should move to the top.',
+        ]);
+
+        $this->actingAs($postOwner)
+            ->post(route('forum.comments.pin', $pinnedComment), [
+                'comments' => 'oldest',
+                'comment_filter' => 'all',
+                'page' => 1,
+            ])
+            ->assertRedirect(route('forum.posts.show', $post).'#comment-'.$pinnedComment->id);
+
+        $this->assertTrue($pinnedComment->fresh()->is_pinned);
+
+        $this->actingAs($postOwner)
+            ->get(route('forum.posts.show', $post))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Pinned comment that should move to the top.',
+                'Regular comment that should stay below the pinned one.',
+            ])
+            ->assertSee('Pinned');
+
+        $this->assertFalse($regularComment->fresh()->is_pinned);
+    }
+
+    public function test_admin_can_pin_any_post_and_comment(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $tagOwner = User::factory()->create();
+        $postOwner = User::factory()->create();
+        $tag = ForumTag::query()->create([
+            'user_id' => $tagOwner->id,
+            'name' => 'Admin Pin Tag',
+            'slug' => 'admin-pin-tag',
+        ]);
+
+        $post = ForumPost::query()->create([
+            'user_id' => $postOwner->id,
+            'forum_tag_id' => $tag->id,
+            'title' => 'Admin pin target post',
+            'body' => 'An administrator should be able to pin this post.',
+        ]);
+
+        $comment = ForumComment::query()->create([
+            'user_id' => $tagOwner->id,
+            'forum_post_id' => $post->id,
+            'body' => 'An administrator should also be able to pin this comment.',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('forum.posts.pin', $post))
+            ->assertRedirect();
+
+        $this->actingAs($admin)
+            ->post(route('forum.comments.pin', $comment), [
+                'comments' => 'oldest',
+                'comment_filter' => 'all',
+                'page' => 1,
+            ])
+            ->assertRedirect(route('forum.posts.show', $post).'#comment-'.$comment->id);
+
+        $this->assertTrue($post->fresh()->is_pinned);
+        $this->assertTrue($comment->fresh()->is_pinned);
+    }
+
+    public function test_post_owner_receives_notification_when_someone_comments(): void
+    {
+        $postOwner = User::factory()->create();
+        $commenter = User::factory()->create();
+
+        $post = ForumPost::query()->create([
+            'user_id' => $postOwner->id,
+            'title' => 'Need feedback on this idea',
+            'body' => 'I am trying to improve my summary writing with timed practice.',
+        ]);
+
+        $this->actingAs($commenter)
+            ->post(route('forum.comments.store', $post), [
+                'body' => 'You could compare your own summary with the source after each practice round.',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('forum_notifications', [
+            'user_id' => $postOwner->id,
+            'actor_id' => $commenter->id,
+            'forum_post_id' => $post->id,
+            'type' => 'post_commented',
+        ]);
+
+        $this->actingAs($postOwner)
+            ->get(route('forum.my'))
+            ->assertOk()
+            ->assertSee('1 new comment')
+            ->assertSee('Need feedback on this idea');
+
+        $this->actingAs($postOwner)
+            ->get(route('forum.posts.show', ['post' => $post, 'notification_post' => 1]))
+            ->assertOk();
+
+        $this->assertNotNull(
+            ForumNotification::query()
+                ->where('user_id', $postOwner->id)
+                ->where('type', 'post_commented')
+                ->first()?->read_at
+        );
+    }
+
+    public function test_comment_author_sees_reply_dot_on_my_forum_and_read_state_clears_when_opening_comment(): void
+    {
+        $postOwner = User::factory()->create();
+        $commentAuthor = User::factory()->create();
+        $replier = User::factory()->create();
+
+        $post = ForumPost::query()->create([
+            'user_id' => $postOwner->id,
+            'title' => 'Reading strategy exchange',
+            'body' => 'Share one method that helps you understand long passages better.',
+        ]);
+
+        $comment = ForumComment::query()->create([
+            'user_id' => $commentAuthor->id,
+            'forum_post_id' => $post->id,
+            'body' => 'I annotate the main claim of each paragraph while reading.',
+        ]);
+
+        $this->actingAs($replier)
+            ->post(route('forum.comments.store', $post), [
+                'body' => 'I do something similar, but I also write one quick summary sentence.',
+                'reply_to_comment_id' => $comment->id,
+            ])
+            ->assertRedirect();
+
+        $notification = ForumNotification::query()
+            ->where('user_id', $commentAuthor->id)
+            ->where('type', 'comment_replied')
+            ->first();
+
+        $this->assertNotNull($notification);
+        $this->assertNull($notification->read_at);
+
+        $this->actingAs($commentAuthor)
+            ->get(route('forum.my'))
+            ->assertOk()
+            ->assertSee('My Forum')
+            ->assertSee('1 new reply')
+            ->assertSee('Reading strategy exchange');
+
+        $this->assertNull($notification->fresh()->read_at);
+
+        $this->actingAs($commentAuthor)
+            ->get(route('forum.posts.show', ['post' => $post, 'notification_comment' => $comment->id]))
+            ->assertOk();
+
+        $this->assertNotNull($notification->fresh()->read_at);
     }
 }

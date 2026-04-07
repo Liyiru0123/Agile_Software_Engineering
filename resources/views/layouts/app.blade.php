@@ -39,6 +39,10 @@
             overflow-wrap: anywhere;
             word-break: break-word;
         }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
     </style>
     @stack('styles')
 </head>
@@ -49,6 +53,38 @@
     $companionGold = $companionProfile?->gold ?? 0;
     $companionEquipped = $companionProfile?->equippedItem?->name;
     $companionNotice = session('companion_notice');
+    $pendingFriendRequestCount = 0;
+    $unreadConversationCount = 0;
+    $unreadForumNotificationCount = 0;
+
+    if (auth()->check()) {
+        $pendingFriendRequestCount = \App\Models\FriendRequest::query()
+            ->where('receiver_id', auth()->id())
+            ->where('status', 'pending')
+            ->count();
+
+        $unreadConversationCount = \App\Models\Conversation::query()
+            ->whereHas('participants', fn ($query) => $query->where('users.id', auth()->id()))
+            ->with([
+                'latestMessage',
+                'participants' => fn ($query) => $query->where('users.id', auth()->id()),
+            ])
+            ->get()
+            ->filter(function (\App\Models\Conversation $conversation) {
+                $latestMessage = $conversation->latestMessage;
+                $lastReadAt = optional($conversation->participants->first()?->pivot)->last_read_at;
+
+                return $latestMessage
+                    && (int) $latestMessage->sender_id !== (int) auth()->id()
+                    && (! $lastReadAt || $latestMessage->created_at?->gt($lastReadAt));
+            })
+            ->count();
+
+        $unreadForumNotificationCount = \App\Models\ForumNotification::query()
+            ->where('user_id', auth()->id())
+            ->whereNull('read_at')
+            ->count();
+    }
 @endphp
 <body class="bg-[#FAF0E6]">
     <nav class="bg-[#4A2C2A] border-b-4 border-[#2C1810] shadow-xl sticky top-0 z-50">
@@ -93,18 +129,73 @@
             </div>
 
             @auth
+                @php
+                    $userName = auth()->user()->name ?? 'User';
+                    $avatarText = mb_strtoupper(trim(mb_substr($userName, 0, 2)));
+                @endphp
                 <div class="flex items-center gap-4">
                     <a href="{{ route('companion.index') }}" class="hidden sm:inline-flex items-center gap-2 rounded-full border border-[#C9A961]/50 bg-[#F5E6D3]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#F5E6D3] hover:bg-[#F5E6D3]/15 transition">
                         <span>Gold</span>
                         <span class="text-[#D4B970]">{{ number_format($companionGold) }}</span>
                     </a>
-                    <span class="text-[#F5E6D3] text-sm font-medium">{{ auth()->user()->name }}</span>
-                    <form method="POST" action="{{ route('logout') }}" class="inline">
-                        @csrf
-                        <button type="submit" class="px-4 py-2 bg-[#6B3D2E] text-[#F5E6D3] rounded-lg hover:bg-[#8B4D3A] transition font-medium text-sm shadow-md">
-                            Logout
-                        </button>
-                    </form>
+                    <details class="relative">
+                        <summary class="flex cursor-pointer list-none items-center gap-3 rounded-full border border-[#C9A961]/40 bg-[#F5E6D3]/10 px-2.5 py-2 text-[#F5E6D3] transition hover:bg-[#F5E6D3]/15">
+                            <span class="relative">
+                                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-[#D4B970] text-sm font-black uppercase tracking-[0.08em] text-[#4A2C2A] shadow-inner">
+                                    {{ $avatarText }}
+                                </span>
+                                @if($pendingFriendRequestCount > 0 || $unreadConversationCount > 0 || $unreadForumNotificationCount > 0)
+                                    <span class="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#D35D47] px-1 text-[10px] font-bold leading-none text-white">
+                                        {{ min(99, $pendingFriendRequestCount + $unreadConversationCount + $unreadForumNotificationCount) }}
+                                    </span>
+                                @endif
+                            </span>
+                            <span class="hidden text-sm font-semibold md:inline">{{ $userName }}</span>
+                            <svg class="h-4 w-4 text-[#D4B970]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </summary>
+
+                        <div class="absolute right-0 top-[calc(100%+0.85rem)] w-60 overflow-hidden rounded-[1.5rem] border border-[#6B3D2E] bg-[#4A2C2A] p-3 shadow-2xl shadow-[#2C1810]/30">
+                            <div class="mb-3 rounded-[1.25rem] bg-[#5C3732] px-4 py-3">
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#D8B58A]">Signed in</div>
+                                <div class="mt-2 text-sm font-semibold text-[#F9EBDD]">{{ $userName }}</div>
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <a href="{{ route('forum.my') }}" class="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-[#F9EBDD] transition hover:bg-[#6B3D2E] {{ request()->routeIs('forum.my') ? 'bg-[#6B3D2E]' : '' }}">
+                                    <span>My Forum</span>
+                                    @if($unreadForumNotificationCount > 0)
+                                        <span class="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#D35D47] px-1.5 text-[11px] font-bold text-white">
+                                            {{ min(99, $unreadForumNotificationCount) }}
+                                        </span>
+                                    @endif
+                                </a>
+                                <a href="{{ route('friends.index') }}" class="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-[#F9EBDD] transition hover:bg-[#6B3D2E] {{ request()->routeIs('friends.*') ? 'bg-[#6B3D2E]' : '' }}">
+                                    <span>Friends</span>
+                                    @if($pendingFriendRequestCount > 0)
+                                        <span class="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#D35D47] px-1.5 text-[11px] font-bold text-white">
+                                            {{ min(99, $pendingFriendRequestCount) }}
+                                        </span>
+                                    @endif
+                                </a>
+                                <a href="{{ route('messages.index') }}" class="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-[#F9EBDD] transition hover:bg-[#6B3D2E] {{ request()->routeIs('messages.*') ? 'bg-[#6B3D2E]' : '' }}">
+                                    <span>Private Messages</span>
+                                    @if($unreadConversationCount > 0)
+                                        <span class="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#D35D47] px-1.5 text-[11px] font-bold text-white">
+                                            {{ min(99, $unreadConversationCount) }}
+                                        </span>
+                                    @endif
+                                </a>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="w-full rounded-xl bg-[#6B3D2E] px-4 py-3 text-left text-sm font-semibold text-[#F9EBDD] transition hover:bg-[#8B4D3A]">
+                                        Logout
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </details>
                 </div>
             @endauth
         </div>
@@ -163,6 +254,29 @@
     </div>
     @stack('scripts')
 
+    @auth
+    <script>
+    (() => {
+        const accountMenu = document.querySelector('nav details');
+
+        if (!accountMenu) {
+            return;
+        }
+
+        document.addEventListener('click', (event) => {
+            if (!accountMenu.contains(event.target)) {
+                accountMenu.removeAttribute('open');
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                accountMenu.removeAttribute('open');
+            }
+        });
+    })();
+    </script>
+    @endauth
     @auth
     <script>
     (() => {
@@ -765,9 +879,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-

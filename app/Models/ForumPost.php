@@ -23,6 +23,13 @@ class ForumPost extends Model
         'attachment_mime_type',
         'attachment_size',
         'view_count',
+        'is_pinned',
+        'pinned_at',
+    ];
+
+    protected $casts = [
+        'is_pinned' => 'boolean',
+        'pinned_at' => 'datetime',
     ];
 
     protected static function booted(): void
