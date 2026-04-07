@@ -18,79 +18,142 @@ use App\Http\Controllers\WritingTrainingController;
 use App\Models\Article;
 use App\Models\Conversation;
 use App\Models\FriendRequest;
+use App\Models\ForumPost;
 use App\Models\ReadingHistory;
 use App\Models\SelectionFavorite;
-use App\Models\Submission;
 use App\Models\UserPlan;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
+Route::get('/', function (Request $request) {
     if (! auth()->check()) {
         return redirect()->route('login');
     }
 
     $user = auth()->user();
-    $today = now()->toDateString();
-    $currentMonth = now()->format('Y-m');
+    $today = \Carbon\Carbon::today();
 
-    $stats = [
-        'total_submissions' => Submission::where('user_id', $user->id)->count(),
-        'total_time' => Submission::where('user_id', $user->id)->sum('time_spent'),
-        'completed_plans' => UserPlan::where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->count(),
-        'current_streak' => 0,
-    ];
+    try {
+        $selectedDate = $request->filled('date')
+            ? \Carbon\Carbon::parse((string) $request->query('date'))->startOfDay()
+            : $today->copy();
+    } catch (\Throwable $exception) {
+        $selectedDate = $today->copy();
+    }
 
-    $plans = UserPlan::where('user_id', $user->id)
-        ->where('plan_date', 'like', "$currentMonth%")
-        ->with('article')
-        ->get()
-        ->keyBy(fn (UserPlan $plan) => \Carbon\Carbon::parse($plan->plan_date)->format('Y-m-d'));
+    try {
+        $currentMonth = $request->filled('month')
+            ? \Carbon\Carbon::createFromFormat('Y-m-d', $request->query('month').'-01')->startOfMonth()
+            : $selectedDate->copy()->startOfMonth();
+    } catch (\Throwable $exception) {
+        $currentMonth = $selectedDate->copy()->startOfMonth();
+    }
 
-    $todayPlan = UserPlan::where('user_id', $user->id)
-        ->where('plan_date', $today)
-        ->with('article')
-        ->first();
+    $monthStart = $currentMonth->copy()->startOfMonth();
+    $monthEnd = $currentMonth->copy()->endOfMonth();
 
-    $recentSubmissions = Submission::where('user_id', $user->id)
-        ->with(['exercise.article'])
-        ->orderByDesc('id')
-        ->take(5)
-        ->get();
+    $sortByDashboardPriority = "CASE status
+        WHEN 'pending' THEN 0
+        WHEN 'skipped' THEN 1
+        WHEN 'completed' THEN 2
+        ELSE 3
+    END";
 
-    $pendingPlans = UserPlan::where('user_id', $user->id)
-        ->where('status', 'pending')
-        ->where('plan_date', '>=', $today)
+    $allPlans = UserPlan::query()
+        ->where('user_id', $user->id)
         ->with('article')
         ->orderBy('plan_date')
-        ->take(5)
+        ->orderByRaw($sortByDashboardPriority)
         ->get();
 
-    $expiredPlans = UserPlan::where('user_id', $user->id)
-        ->where('plan_date', '<', $today)
-        ->where('status', 'pending')
-        ->get()
-        ->map(fn (UserPlan $plan) => \Carbon\Carbon::parse($plan->plan_date)->format('Y-m-d'))
-        ->toArray();
+    $monthPlans = $allPlans
+        ->filter(fn (UserPlan $plan) => $plan->plan_date && $plan->plan_date->between($monthStart, $monthEnd));
 
-    $overduePlans = UserPlan::where('user_id', $user->id)
-        ->where('status', 'pending')
-        ->where('plan_date', '<', $today)
-        ->with('article')
-        ->orderByDesc('plan_date')
+    $calendarPlans = $monthPlans
+        ->groupBy(fn (UserPlan $plan) => $plan->plan_date->toDateString())
+        ->map(function ($plans, string $date) use ($today) {
+            $total = $plans->count();
+            $completed = $plans->where('status', 'completed')->count();
+            $pending = $plans->where('status', 'pending')->count();
+            $skipped = $plans->where('status', 'skipped')->count();
+
+            return [
+                'total' => $total,
+                'completed' => $completed,
+                'pending' => $pending,
+                'skipped' => $skipped,
+                'completion_rate' => $total > 0 ? (int) round(($completed / $total) * 100) : 0,
+                'has_overdue' => $pending > 0 && $date < $today->toDateString(),
+            ];
+        });
+
+    $selectedTasks = $allPlans
+        ->filter(fn (UserPlan $plan) => $plan->plan_date && $plan->plan_date->isSameDay($selectedDate))
+        ->values();
+
+    $todayTasks = $allPlans
+        ->filter(fn (UserPlan $plan) => $plan->plan_date && $plan->plan_date->isSameDay($today))
+        ->values();
+
+    $overdueTasks = $allPlans
+        ->filter(fn (UserPlan $plan) => $plan->status === 'pending' && $plan->plan_date && $plan->plan_date->lt($today))
         ->take(5)
-        ->get();
+        ->values();
 
-    $articles = Article::orderBy('title')->get();
+    $weeklyStart = $today->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
+    $weeklyEnd = $today->copy()->endOfWeek(\Carbon\Carbon::MONDAY);
 
-    $favoritedArticles = Article::join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
+    $weeklyPlans = $allPlans
+        ->filter(fn (UserPlan $plan) => $plan->plan_date && $plan->plan_date->between($weeklyStart, $weeklyEnd))
+        ->values();
+
+    $weeklySummary = [
+        'label' => $weeklyStart->format('M j').' - '.$weeklyEnd->format('M j'),
+        'total' => $weeklyPlans->count(),
+        'completed' => $weeklyPlans->where('status', 'completed')->count(),
+        'pending' => $weeklyPlans->where('status', 'pending')->count(),
+    ];
+    $weeklySummary['completion_rate'] = $weeklySummary['total'] > 0
+        ? (int) round(($weeklySummary['completed'] / $weeklySummary['total']) * 100)
+        : 0;
+
+    $monthlySummary = [
+        'label' => $currentMonth->format('F Y'),
+        'total' => $monthPlans->count(),
+        'completed' => $monthPlans->where('status', 'completed')->count(),
+        'pending' => $monthPlans->where('status', 'pending')->count(),
+    ];
+    $monthlySummary['completion_rate'] = $monthlySummary['total'] > 0
+        ? (int) round(($monthlySummary['completed'] / $monthlySummary['total']) * 100)
+        : 0;
+
+    $todaySummary = [
+        'total' => $todayTasks->count(),
+        'completed' => $todayTasks->where('status', 'completed')->count(),
+        'pending' => $todayTasks->where('status', 'pending')->count(),
+        'skipped' => $todayTasks->where('status', 'skipped')->count(),
+    ];
+
+    $favoritePlanArticles = Article::query()
+        ->join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
         ->where('user_favorites.user_id', $user->id)
         ->select('articles.*', 'user_favorites.created_at as favorited_at')
         ->orderByDesc('user_favorites.created_at')
-        ->take(6)
+        ->get();
+
+    $favoriteArticleIds = $favoritePlanArticles
+        ->pluck('id')
+        ->map(fn ($id) => (int) $id)
+        ->all();
+
+    $otherArticles = Article::query()
+        ->when(
+            count($favoriteArticleIds) > 0,
+            fn ($query) => $query->whereNotIn('id', $favoriteArticleIds)
+        )
+        ->orderBy('title')
         ->get();
 
     $history = ReadingHistory::query()
@@ -122,7 +185,7 @@ Route::get('/', function () {
         ->first();
 
     $historySummary = [
-        'recent' => $history,
+        'recent' => $history->take(3)->values(),
         'active_days_7d' => $activeDays7d,
         'continue_url' => $latestHistory?->continue_url ?? route('articles.index'),
     ];
@@ -147,24 +210,40 @@ Route::get('/', function () {
         'review_pending' => SelectionFavorite::query()
             ->where('user_id', $user->id)
             ->count(),
-        'recent' => $notebook,
+        'recent' => $notebook->take(3)->values(),
+    ];
+
+    $favoritesSummary = [
+        'total' => $favoritePlanArticles->count(),
+        'recent' => $favoritePlanArticles->take(3)->values(),
+    ];
+
+    $communitySummary = [
+        'my_posts_count' => ForumPost::query()
+            ->where('user_id', $user->id)
+            ->count(),
+        'saved_posts_count' => $user->favoritedForumPosts()->count(),
     ];
     return view('home', compact(
-        'stats',
-        'plans',
-        'todayPlan',
-        'recentSubmissions',
-        'pendingPlans',
-        'articles',
-        'favoritedArticles',
+        'selectedDate',
+        'currentMonth',
+        'calendarPlans',
+        'selectedTasks',
+        'overdueTasks',
+        'weeklySummary',
+        'monthlySummary',
+        'todaySummary',
+        'favoritePlanArticles',
+        'otherArticles',
         'history',
         'historySummary',
         'notebook',
         'notebookSummary',
+        'favoritesSummary',
+        'communitySummary',
         'today',
-        'currentMonth',
-        'expiredPlans',
-        'overduePlans'
+        'monthStart',
+        'monthEnd'
     ));
 })->name('home')->middleware('auth');
 
@@ -195,20 +274,89 @@ Route::post('/plans', function (Request $request) {
     $user = auth()->user();
 
     $validated = $request->validate([
-        'article_id' => 'required|exists:articles,id',
         'plan_date' => 'required|date',
+        'plan_kind' => 'required|in:article,skill,custom',
+        'article_id' => 'nullable|exists:articles,id',
+        'skill_type' => 'nullable|in:listening,speaking',
+        'target_count' => 'nullable|integer|min:1|max:10',
+        'custom_title' => 'nullable|string|max:120',
     ]);
 
-    $plan = UserPlan::updateOrCreate(
-        [
-            'user_id' => $user->id,
-            'article_id' => $validated['article_id'],
-            'plan_date' => $validated['plan_date'],
-        ],
-        ['status' => 'pending']
-    );
+    if ($validated['plan_kind'] === 'article' && empty($validated['article_id'])) {
+        throw ValidationException::withMessages([
+            'article_id' => 'Please choose an article for an article plan.',
+        ]);
+    }
 
-    return response()->json(['success' => true, 'plan' => $plan]);
+    if ($validated['plan_kind'] === 'skill' && (empty($validated['skill_type']) || empty($validated['target_count']))) {
+        throw ValidationException::withMessages([
+            'skill_type' => 'Please choose a skill and target count.',
+        ]);
+    }
+
+    if ($validated['plan_kind'] === 'custom' && trim((string) ($validated['custom_title'] ?? '')) === '') {
+        throw ValidationException::withMessages([
+            'custom_title' => 'Please enter a custom task.',
+        ]);
+    }
+
+    $plan = match ($validated['plan_kind']) {
+        'article' => (function () use ($user, $validated) {
+            return UserPlan::query()->updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'plan_kind' => 'article',
+                    'article_id' => $validated['article_id'],
+                    'plan_date' => $validated['plan_date'],
+                ],
+                [
+                    'title' => null,
+                    'skill_type' => null,
+                    'target_count' => null,
+                    'status' => 'pending',
+                ]
+            );
+        })(),
+        'skill' => (function () use ($user, $validated) {
+            return UserPlan::query()->updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'plan_kind' => 'skill',
+                    'plan_date' => $validated['plan_date'],
+                    'skill_type' => $validated['skill_type'],
+                    'target_count' => $validated['target_count'],
+                ],
+                [
+                    'article_id' => null,
+                    'title' => ucfirst($validated['skill_type']).' practice x'.$validated['target_count'],
+                    'status' => 'pending',
+                ]
+            );
+        })(),
+        default => (function () use ($user, $validated) {
+            return UserPlan::query()->create([
+                'user_id' => $user->id,
+                'article_id' => null,
+                'plan_date' => $validated['plan_date'],
+                'plan_kind' => 'custom',
+                'title' => trim((string) $validated['custom_title']),
+                'skill_type' => null,
+                'target_count' => null,
+                'status' => 'pending',
+            ]);
+        })(),
+    };
+
+    if ($request->expectsJson()) {
+        return response()->json(['success' => true, 'plan' => $plan]);
+    }
+
+    return redirect()
+        ->route('home', [
+            'date' => $validated['plan_date'],
+            'month' => \Carbon\Carbon::parse($validated['plan_date'])->format('Y-m'),
+        ])
+        ->with('status', 'Study plan added.');
 })->name('plans.store')->middleware('auth');
 
 Route::patch('/plans/{plan}', function (Request $request, UserPlan $plan) {
@@ -225,7 +373,11 @@ Route::patch('/plans/{plan}', function (Request $request, UserPlan $plan) {
         'completed_at' => $validated['status'] === 'completed' ? now() : null,
     ]);
 
-    return response()->json(['success' => true, 'plan' => $plan]);
+    if ($request->expectsJson()) {
+        return response()->json(['success' => true, 'plan' => $plan]);
+    }
+
+    return back()->with('status', 'Plan updated.');
 })->name('plans.update')->middleware('auth');
 
 Route::get('/articles', function (Request $request) {
@@ -416,5 +568,4 @@ Route::get('/register', function () {
 })->name('register')->middleware('guest');
 
 Route::post('/register', [RegisterController::class, 'register'])->name('register.post');
-
 

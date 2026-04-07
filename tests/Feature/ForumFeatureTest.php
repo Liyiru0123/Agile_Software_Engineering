@@ -50,7 +50,7 @@ class ForumFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('My Forum')
             ->assertSee('How I practice paraphrasing')
-            ->assertSee('This method also helps me notice repeated vocabulary.');
+            ->assertSee('Writing Tips');
     }
 
     public function test_user_can_delete_own_post_and_comment(): void
@@ -574,7 +574,7 @@ class ForumFeatureTest extends TestCase
             ->assertDontSeeText('Comment page 01');
     }
 
-    public function test_saved_forum_posts_are_visible_on_my_forum_page(): void
+    public function test_saved_forum_posts_are_visible_on_saved_posts_page(): void
     {
         $user = User::factory()->create();
         $author = User::factory()->create();
@@ -589,9 +589,8 @@ class ForumFeatureTest extends TestCase
             ->assertRedirect();
 
         $this->actingAs($user)
-            ->get(route('forum.my'))
+            ->get(route('forum.saved'))
             ->assertOk()
-            ->assertSee('Saved Forum Posts')
             ->assertSee('Saved dashboard post');
     }
 
