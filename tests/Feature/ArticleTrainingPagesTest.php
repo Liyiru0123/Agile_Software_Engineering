@@ -6,7 +6,11 @@ use App\Models\Article;
 use App\Models\Exercise;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\GeminiAudioService;
+use App\Services\SpeakingExerciseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ArticleTrainingPagesTest extends TestCase
@@ -201,5 +205,130 @@ class ArticleTrainingPagesTest extends TestCase
             ->assertSee('Open Response Tasks')
             ->assertSee('Autonomous transit systems could reduce congestion in large cities.')
             ->assertSee('Would you trust autonomous public transport in your city?');
+    }
+
+    public function test_shadowing_submission_works_without_open_response_exercise(): void
+    {
+        Storage::fake('public');
+        config(['services.speaking.provider' => 'gemini']);
+
+        $this->mock(GeminiAudioService::class, function ($mock) {
+            $mock->shouldReceive('evaluateAudio')
+                ->once()
+                ->andReturn([
+                    'score' => 86,
+                    'fluency' => ['score' => 8.2, 'comment' => 'Smooth overall.'],
+                    'relevance' => ['score' => 8.4, 'comment' => 'Accurate repetition.'],
+                    'pronunciation' => ['score' => 8.1, 'comment' => 'Mostly clear.'],
+                    'transcript' => 'Autonomous systems could reduce congestion in large cities.',
+                    'feedback' => 'Good attempt with minor wording loss.',
+                ]);
+        });
+
+        $user = User::factory()->create();
+        $article = Article::query()->create([
+            'title' => 'Autonomous Transit Systems',
+            'content' => 'Autonomous transit systems could reduce congestion in large cities. '
+                .'They may also help elderly passengers and people with disabilities travel more independently. '
+                .'However, public trust depends on safety, reliability, and clear accountability when problems occur.',
+            'audio_url' => 'https://example.com/demo.mp3',
+            'difficulty' => 2,
+            'word_count' => 33,
+        ]);
+
+        $clip = app(SpeakingExerciseService::class)->buildShadowingClips($article)[0];
+
+        $response = $this->actingAs($user)->post(route('articles.speaking.submit', $article), [
+            'practice_mode' => 'shadowing',
+            'shadowing_clip_id' => $clip['id'],
+            'audio' => UploadedFile::fake()->createWithContent('shadowing.webm', 'fake-audio-content'),
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('evaluation.practice_mode', 'shadowing')
+            ->assertJsonPath('evaluation.clip_id', $clip['id']);
+
+        $submission = Submission::query()->firstOrFail();
+
+        $this->assertSame('shadowing', data_get($submission->user_answer, 'practice_mode'));
+        $this->assertSame($clip['id'], data_get($submission->user_answer, 'shadowing_clip_id'));
+        $this->assertSame('shadowing', data_get($submission->exercise?->question_data, 'mode'));
+        Storage::disk('public')->assertExists((string) data_get($submission->user_answer, 'audio_path'));
+    }
+
+    public function test_shadowing_submission_with_invalid_clip_does_not_store_audio_file(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+        $article = Article::query()->create([
+            'title' => 'Autonomous Transit Systems',
+            'content' => 'Autonomous transit systems could reduce congestion in large cities. '
+                .'They may also help elderly passengers and people with disabilities travel more independently.',
+            'audio_url' => 'https://example.com/demo.mp3',
+            'difficulty' => 2,
+            'word_count' => 22,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('articles.speaking.submit', $article), [
+            'practice_mode' => 'shadowing',
+            'shadowing_clip_id' => 'shadow-missing',
+            'audio' => UploadedFile::fake()->createWithContent('shadowing.webm', 'fake-audio-content'),
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('message', 'The selected shadowing clip could not be found.');
+
+        $this->assertSame([], Storage::disk('public')->allFiles('submissions/speaking'));
+        $this->assertDatabaseCount('submissions', 0);
+    }
+
+    public function test_speaking_submission_deletes_uploaded_audio_when_ai_evaluation_fails(): void
+    {
+        Storage::fake('public');
+        config(['services.speaking.provider' => 'gemini']);
+
+        $this->mock(GeminiAudioService::class, function ($mock) {
+            $mock->shouldReceive('evaluateAudio')
+                ->once()
+                ->andReturn([
+                    'error' => 'AI evaluation service is temporarily unavailable.',
+                ]);
+        });
+
+        $user = User::factory()->create();
+        $article = Article::query()->create([
+            'title' => 'Bridge Safety',
+            'content' => 'Bridges need careful maintenance and routine inspection.',
+            'difficulty' => 2,
+            'word_count' => 7,
+        ]);
+        $exercise = Exercise::query()->create([
+            'article_id' => $article->id,
+            'type' => 'speaking',
+            'question_data' => [
+                'title' => 'Opinion Prompt',
+                'instruction' => 'Explain the main idea of the article.',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->post(route('articles.speaking.submit', $article), [
+            'exercise_id' => $exercise->id,
+            'practice_mode' => 'open_response',
+            'audio' => UploadedFile::fake()->createWithContent('response.webm', 'fake-audio-content'),
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('message', 'AI evaluation service is temporarily unavailable.');
+
+        $this->assertSame([], Storage::disk('public')->allFiles('submissions/speaking'));
+        $this->assertDatabaseCount('submissions', 0);
     }
 }

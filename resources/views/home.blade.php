@@ -44,20 +44,6 @@
         'recent' => $notebook->take(3),
     ];
 
-    $forumPostsSummary = $forumPostsSummary ?? [
-        'count' => 0,
-        'recent' => collect(),
-    ];
-
-    $forumCommentsSummary = $forumCommentsSummary ?? [
-        'count' => 0,
-        'recent' => collect(),
-    ];
-
-    $forumSavedSummary = $forumSavedSummary ?? [
-        'count' => 0,
-        'recent' => collect(),
-    ];
 
     $analysis = $analysis ?? [
         'study_minutes' => 0,
@@ -327,7 +313,7 @@
                 </div>
                 <div class="mt-4 space-y-2">
                     @forelse(collect($favoritesSummary['recent']) as $item)
-                        <div class="text-sm text-[#6B3D2E] truncate">• {{ $item->title ?? ($item['title'] ?? 'Untitled Article') }}</div>
+                        <div class="text-sm text-[#6B3D2E] truncate">- {{ $item->title ?? ($item['title'] ?? 'Untitled Article') }}</div>
                     @empty
                         <div class="text-sm text-[#A58A6A]">No favorites yet</div>
                     @endforelse
@@ -359,7 +345,7 @@
                 </div>
                 <div class="mt-4 space-y-2">
                     @forelse(collect($historySummary['recent']) as $item)
-                        <div class="text-sm text-[#6B3D2E] truncate">• {{ $item->title ?? ($item['title'] ?? 'Untitled Content') }}</div>
+                        <div class="text-sm text-[#6B3D2E] truncate">- {{ $item->title ?? ($item['title'] ?? 'Untitled Content') }}</div>
                     @empty
                         <div class="text-sm text-[#A58A6A]">No browsing history yet</div>
                     @endforelse
@@ -431,8 +417,8 @@
 
                     <div class="text-sm font-semibold text-[#6B3D2E]">Smart Recommendations</div>
                     <ul class="mt-2 space-y-1.5 text-xs text-[#6B3D2E]">
-                        <li>• Priority: strengthen {{ $focusArea }} (current {{ $focusAccuracy }}%).</li>
-                        <li>• {{ $rhythmTip }}</li>
+                        <li>- Priority: strengthen {{ $focusArea }} (current {{ $focusAccuracy }}%).</li>
+                        <li>- {{ $rhythmTip }}</li>
                     </ul>
                 </div>
 
@@ -441,117 +427,5 @@
         </div>
     </section>
 
-    <section class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h3 class="text-2xl font-black text-[#4A2C2A]">Forum Activity</h3>
-                <p class="text-sm text-[#8B6B47]">Review your recent posts and jump straight back to your discussions.</p>
-            </div>
-            <a href="{{ route('forum.index') }}"
-               class="inline-flex items-center rounded-lg bg-[#4A2C2A] px-4 py-2 text-sm font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
-                Open Forum
-            </a>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <article class="rounded-2xl border border-[#E6D3BC] bg-[#FDF7EE] shadow-sm p-6">
-                <div class="flex items-center justify-between gap-3">
-                    <h4 class="text-lg font-black text-[#4A2C2A]">My Posts</h4>
-                    <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">
-                        {{ $forumPostsSummary['count'] }} total
-                    </span>
-                </div>
-
-                <div class="mt-4 space-y-3">
-                    @forelse(collect($forumPostsSummary['recent']) as $item)
-                        <a href="{{ $item['url'] }}"
-                           class="block rounded-xl border border-[#E6D3BC] bg-white/70 px-4 py-3 hover:border-[#C9A961] hover:bg-white transition">
-                            <div class="text-sm font-semibold text-[#4A2C2A]">{{ $item['title'] }}</div>
-                            <div class="mt-1 text-xs text-[#8B6B47]">
-                                {{ $item['tag_name'] ? 'Tag: '.$item['tag_name'] : 'Default forum' }}
-                                @if(!empty($item['created_at']))
-                                    · {{ $item['created_at'] }}
-                                @endif
-                            </div>
-                        </a>
-                    @empty
-                        <div class="rounded-xl border border-dashed border-[#D8C3A6] bg-white/50 px-4 py-5 text-sm text-[#8B6B47]">
-                            You have not published any forum posts yet.
-                        </div>
-                    @endforelse
-                </div>
-            </article>
-
-            <article class="rounded-2xl border border-[#E6D3BC] bg-[#FDF7EE] shadow-sm p-6">
-                <div class="flex items-center justify-between gap-3">
-                    <h4 class="text-lg font-black text-[#4A2C2A]">My Comments</h4>
-                    <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">
-                        {{ $forumCommentsSummary['count'] }} total
-                    </span>
-                </div>
-
-                <div class="mt-4 space-y-3">
-                    @forelse(collect($forumCommentsSummary['recent']) as $item)
-                        <a href="{{ $item['url'] }}"
-                           class="block rounded-xl border border-[#E6D3BC] bg-white/70 px-4 py-3 hover:border-[#C9A961] hover:bg-white transition">
-                            <div class="text-sm text-[#4A2C2A]">{{ $item['excerpt'] }}</div>
-                            <div class="mt-1 text-xs text-[#8B6B47]">
-                                On: {{ $item['post_title'] }}
-                                @if(!empty($item['created_at']))
-                                    · {{ $item['created_at'] }}
-                                @endif
-                            </div>
-                        </a>
-                    @empty
-                        <div class="rounded-xl border border-dashed border-[#D8C3A6] bg-white/50 px-4 py-5 text-sm text-[#8B6B47]">
-                            You have not commented in the forum yet.
-                        </div>
-                    @endforelse
-                </div>
-            </article>
-        </div>
-    </section>
-
-    <section class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h3 class="text-2xl font-black text-[#4A2C2A]">Saved Forum Posts</h3>
-                <p class="text-sm text-[#8B6B47]">Jump back into discussions you bookmarked for later review.</p>
-            </div>
-            <a href="{{ route('forum.index', ['author' => 'all']) }}"
-               class="inline-flex items-center rounded-lg bg-[#4A2C2A] px-4 py-2 text-sm font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
-                Browse Forum
-            </a>
-        </div>
-
-        <article class="rounded-2xl border border-[#E6D3BC] bg-[#FDF7EE] shadow-sm p-6">
-            <div class="flex items-center justify-between gap-3">
-                <h4 class="text-lg font-black text-[#4A2C2A]">Saved Posts</h4>
-                <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">
-                    {{ $forumSavedSummary['count'] }} total
-                </span>
-            </div>
-
-            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                @forelse(collect($forumSavedSummary['recent']) as $item)
-                    <a href="{{ $item['url'] }}"
-                       class="block rounded-xl border border-[#E6D3BC] bg-white/70 px-4 py-4 hover:border-[#C9A961] hover:bg-white transition">
-                        <div class="text-sm font-semibold text-[#4A2C2A]">{{ $item['title'] }}</div>
-                        <div class="mt-2 text-xs text-[#8B6B47]">
-                            {{ $item['tag_name'] ? 'Tag: '.$item['tag_name'] : 'Default forum' }}
-                            · By {{ $item['author_name'] }}
-                        </div>
-                        @if(!empty($item['saved_at']))
-                            <div class="mt-2 text-xs text-[#A58A6A]">Saved {{ $item['saved_at'] }}</div>
-                        @endif
-                    </a>
-                @empty
-                    <div class="md:col-span-3 rounded-xl border border-dashed border-[#D8C3A6] bg-white/50 px-4 py-5 text-sm text-[#8B6B47]">
-                        You have not saved any forum posts yet.
-                    </div>
-                @endforelse
-            </div>
-        </article>
-    </section>
 </div>
 @endsection

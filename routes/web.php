@@ -5,17 +5,19 @@ use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\FavoritesController;
+use App\Http\Controllers\FriendController;
 use App\Http\Controllers\ForumController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\ListeningTrainingController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotebookController;
 use App\Http\Controllers\CompanionController;
 use App\Http\Controllers\ReadingQuestionAttemptController;
 use App\Http\Controllers\SelectionTranslationController;
 use App\Http\Controllers\WritingTrainingController;
 use App\Models\Article;
-use App\Models\ForumComment;
-use App\Models\ForumPost;
+use App\Models\Conversation;
+use App\Models\FriendRequest;
 use App\Models\ReadingHistory;
 use App\Models\SelectionFavorite;
 use App\Models\Submission;
@@ -147,61 +149,6 @@ Route::get('/', function () {
             ->count(),
         'recent' => $notebook,
     ];
-
-    $forumPostsSummary = [
-        'count' => ForumPost::query()
-            ->where('user_id', $user->id)
-            ->count(),
-        'recent' => ForumPost::query()
-            ->with('tag:id,name,slug')
-            ->where('user_id', $user->id)
-            ->latest()
-            ->take(3)
-            ->get()
-            ->map(fn (ForumPost $post) => [
-                'title' => $post->title,
-                'tag_name' => $post->tag?->name,
-                'url' => route('forum.posts.show', $post),
-                'created_at' => optional($post->created_at)?->diffForHumans(),
-            ]),
-    ];
-
-    $forumCommentsSummary = [
-        'count' => ForumComment::query()
-            ->where('user_id', $user->id)
-            ->count(),
-        'recent' => ForumComment::query()
-            ->with('post:id,title')
-            ->where('user_id', $user->id)
-            ->latest()
-            ->take(3)
-            ->get()
-            ->map(fn (ForumComment $comment) => [
-                'excerpt' => \Illuminate\Support\Str::limit($comment->body, 90),
-                'post_title' => $comment->post?->title ?? 'Forum Post',
-                'url' => $comment->post
-                    ? route('forum.posts.show', $comment->post).'#comment-'.$comment->id
-                    : route('forum.index'),
-                'created_at' => optional($comment->created_at)?->diffForHumans(),
-            ]),
-    ];
-
-    $forumSavedSummary = [
-        'count' => $user->favoritedForumPosts()->count(),
-        'recent' => $user->favoritedForumPosts()
-            ->with(['tag:id,name,slug', 'user:id,name'])
-            ->latest('forum_post_favorites.created_at')
-            ->take(3)
-            ->get()
-            ->map(fn (ForumPost $post) => [
-                'title' => $post->title,
-                'tag_name' => $post->tag?->name,
-                'author_name' => $post->user?->name ?? 'Unknown',
-                'url' => route('forum.posts.show', $post),
-                'saved_at' => optional($post->pivot?->created_at)?->diffForHumans(),
-            ]),
-    ];
-
     return view('home', compact(
         'stats',
         'plans',
@@ -214,9 +161,6 @@ Route::get('/', function () {
         'historySummary',
         'notebook',
         'notebookSummary',
-        'forumPostsSummary',
-        'forumCommentsSummary',
-        'forumSavedSummary',
         'today',
         'currentMonth',
         'expiredPlans',
@@ -385,6 +329,7 @@ Route::post('/articles/{article}/toggle-favorite', function (Article $article) {
 })->name('articles.toggle-favorite')->middleware('auth');
 
 Route::get('/forum', [ForumController::class, 'index'])->name('forum.index')->middleware('auth');
+Route::get('/forum/my', [ForumController::class, 'myForum'])->name('forum.my')->middleware('auth');
 Route::get('/forum/saved', [ForumController::class, 'saved'])->name('forum.saved')->middleware('auth');
 Route::get('/forum/tags/create', [ForumController::class, 'createTag'])->name('forum.tags.create')->middleware('auth');
 Route::post('/forum/tags', [ForumController::class, 'storeTag'])->name('forum.tags.store')->middleware('auth');
@@ -394,11 +339,25 @@ Route::post('/forum/posts', [ForumController::class, 'storePost'])->name('forum.
 Route::get('/forum/posts/{post}', [ForumController::class, 'show'])->name('forum.posts.show')->middleware('auth');
 Route::patch('/forum/posts/{post}', [ForumController::class, 'updatePost'])->name('forum.posts.update')->middleware('auth');
 Route::delete('/forum/posts/{post}', [ForumController::class, 'destroyPost'])->name('forum.posts.destroy')->middleware('auth');
+Route::post('/forum/posts/{post}/pin', [ForumController::class, 'togglePostPin'])->name('forum.posts.pin')->middleware('auth');
 Route::post('/forum/posts/{post}/like', [ForumController::class, 'toggleLike'])->name('forum.posts.like')->middleware('auth');
 Route::post('/forum/posts/{post}/favorite', [ForumController::class, 'toggleFavorite'])->name('forum.posts.favorite')->middleware('auth');
 Route::post('/forum/posts/{post}/comments', [ForumController::class, 'storeComment'])->name('forum.comments.store')->middleware('auth');
+Route::post('/forum/comments/{comment}/pin', [ForumController::class, 'toggleCommentPin'])->name('forum.comments.pin')->middleware('auth');
 Route::patch('/forum/comments/{comment}', [ForumController::class, 'updateComment'])->name('forum.comments.update')->middleware('auth');
 Route::delete('/forum/comments/{comment}', [ForumController::class, 'destroyComment'])->name('forum.comments.destroy')->middleware('auth');
+
+Route::get('/friends', [FriendController::class, 'index'])->name('friends.index')->middleware('auth');
+Route::post('/friends/requests', [FriendController::class, 'store'])->name('friends.requests.store')->middleware('auth');
+Route::post('/friends/requests/{friendRequest}/accept', [FriendController::class, 'accept'])->name('friends.requests.accept')->middleware('auth');
+Route::post('/friends/requests/{friendRequest}/reject', [FriendController::class, 'reject'])->name('friends.requests.reject')->middleware('auth');
+Route::delete('/friends/requests/{friendRequest}', [FriendController::class, 'cancel'])->name('friends.requests.cancel')->middleware('auth');
+Route::delete('/friends/{user}', [FriendController::class, 'destroy'])->name('friends.destroy')->middleware('auth');
+
+Route::get('/messages', [MessageController::class, 'index'])->name('messages.index')->middleware('auth');
+Route::get('/messages/{conversation}', [MessageController::class, 'index'])->name('messages.show')->middleware('auth');
+Route::post('/messages/start', [MessageController::class, 'start'])->name('messages.start')->middleware('auth');
+Route::post('/messages/{conversation}', [MessageController::class, 'store'])->name('messages.store')->middleware('auth');
 
 Route::get('/history', [HistoryController::class, 'index'])->name('history.index')->middleware('auth');
 Route::get('/history/continue', [HistoryController::class, 'continue'])->name('history.continue')->middleware('auth');
@@ -424,3 +383,5 @@ Route::get('/register', function () {
 })->name('register')->middleware('guest');
 
 Route::post('/register', [RegisterController::class, 'register'])->name('register.post');
+
+

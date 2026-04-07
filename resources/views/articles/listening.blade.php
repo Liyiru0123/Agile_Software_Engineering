@@ -26,6 +26,12 @@
                 Listen to the audio and complete all listening tasks in one flow: dictation, multiple choice, summary, then transcript review.
             </p>
 
+            @if(!empty($listeningExercise['latest_submission']))
+                <div class="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 mb-6">
+                    Your latest listening attempt has been restored. You can review it directly or update your answers and submit again.
+                </div>
+            @endif
+
 
 
             @if($audioUrl)
@@ -453,11 +459,15 @@ function initDictation() {
             });
 
             const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Unable to check answers right now.');
+            }
+
             renderResults(data.result);
         } catch (error) {
             summaryPanel?.classList.remove('hidden');
             if (summaryText) {
-                summaryText.textContent = 'Unable to check answers right now.';
+                summaryText.textContent = error.message || 'Unable to check answers right now.';
             }
         } finally {
             completeBtn.disabled = false;
@@ -1000,4 +1010,3 @@ function escapeHtml(value) {
 }
 </script>
 @endpush
-
