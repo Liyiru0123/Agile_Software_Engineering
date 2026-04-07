@@ -16,6 +16,29 @@
             opacity: 1;
             transform: translateY(0);
         }
+
+        .forum-preview-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+            overflow: hidden;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .forum-title-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .forum-content-wrap {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
     </style>
     @stack('styles')
 </head>
@@ -49,6 +72,10 @@
                     <a href="{{ route('articles.index') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('articles.*') ? 'bg-[#6B3D2E]' : '' }}">
                         Library
+                    </a>
+                    <a href="{{ route('forum.index') }}"
+                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('forum.*') ? 'bg-[#6B3D2E]' : '' }}">
+                        Forum
                     </a>
                     <a href="{{ route('companion.index') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('companion.*') ? 'bg-[#6B3D2E]' : '' }}">
@@ -730,9 +757,6 @@
     </script>
 </body>
 </html>
-
-
-
 
 
 

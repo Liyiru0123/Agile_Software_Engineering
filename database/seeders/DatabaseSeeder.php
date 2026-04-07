@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             AiPromptSeeder::class,
             ArticleSeeder::class,
             VocabularySeeder::class,
+            AdminUserSeeder::class,
         ]);
         
         $this->command->info('✅ All test data seeded successfully!');
