@@ -69,9 +69,13 @@
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('home') ? 'bg-[#6B3D2E]' : '' }}">
                         Dashboard
                     </a>
-                    <a href="{{ route('articles.index') }}"
-                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('articles.*') ? 'bg-[#6B3D2E]' : '' }}">
-                        Learning
+                    <a href="{{ route('articles.index', ['skill' => 'listening']) }}"
+                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ (request()->routeIs('articles.listening') || (request()->routeIs('articles.index') && request('skill', 'listening') === 'listening')) ? 'bg-[#6B3D2E]' : '' }}">
+                        Listening
+                    </a>
+                    <a href="{{ route('articles.index', ['skill' => 'speaking']) }}"
+                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ (request()->routeIs('articles.speaking') || (request()->routeIs('articles.index') && request('skill') === 'speaking')) ? 'bg-[#6B3D2E]' : '' }}">
+                        Speaking
                     </a>
                     <a href="{{ route('forum.index') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('forum.*') ? 'bg-[#6B3D2E]' : '' }}">

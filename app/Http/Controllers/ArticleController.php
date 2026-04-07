@@ -70,6 +70,26 @@ class ArticleController extends Controller
         $data['listeningReadingQuestions'] = $this->readingExerciseService->getPublicQuestions($article);
         $data['articleSentenceMap'] = $this->buildArticleSentenceMap($data['paragraphs']);
 
+        $latestReadingResult = null;
+        if (auth()->id()) {
+            $readingExerciseIds = $article->exercises()
+                ->where('type', 'reading')
+                ->pluck('id');
+
+            if ($readingExerciseIds->isNotEmpty()) {
+                $latestReadingSubmission = Submission::query()
+                    ->where('user_id', auth()->id())
+                    ->where('article_id', $article->id)
+                    ->whereIn('exercise_id', $readingExerciseIds)
+                    ->orderByDesc('id')
+                    ->first();
+
+                $latestReadingResult = $latestReadingSubmission?->ai_advice;
+            }
+        }
+
+        $data['latestReadingResult'] = $latestReadingResult;
+
         return view('articles.listening', $data);
     }
 
