@@ -47,7 +47,15 @@
     @stack('styles')
 </head>
 @php
-    $companionProfile = auth()->check()
+    $hasCompanionTables = \Illuminate\Support\Facades\Schema::hasTable('companion_profiles')
+        && \Illuminate\Support\Facades\Schema::hasTable('companion_shop_items');
+    $hasFriendRequestsTable = \Illuminate\Support\Facades\Schema::hasTable('friend_requests');
+    $hasConversationTables = \Illuminate\Support\Facades\Schema::hasTable('conversations')
+        && \Illuminate\Support\Facades\Schema::hasTable('conversation_participants')
+        && \Illuminate\Support\Facades\Schema::hasTable('conversation_messages');
+    $hasForumNotificationsTable = \Illuminate\Support\Facades\Schema::hasTable('forum_notifications');
+
+    $companionProfile = auth()->check() && $hasCompanionTables
         ? \App\Models\CompanionProfile::query()->with('equippedItem')->where('user_id', auth()->id())->first()
         : null;
     $companionGold = $companionProfile?->gold ?? 0;
@@ -58,32 +66,38 @@
     $unreadForumNotificationCount = 0;
 
     if (auth()->check()) {
-        $pendingFriendRequestCount = \App\Models\FriendRequest::query()
-            ->where('receiver_id', auth()->id())
-            ->where('status', 'pending')
-            ->count();
+        if ($hasFriendRequestsTable) {
+            $pendingFriendRequestCount = \App\Models\FriendRequest::query()
+                ->where('receiver_id', auth()->id())
+                ->where('status', 'pending')
+                ->count();
+        }
 
-        $unreadConversationCount = \App\Models\Conversation::query()
-            ->whereHas('participants', fn ($query) => $query->where('users.id', auth()->id()))
-            ->with([
-                'latestMessage',
-                'participants' => fn ($query) => $query->where('users.id', auth()->id()),
-            ])
-            ->get()
-            ->filter(function (\App\Models\Conversation $conversation) {
-                $latestMessage = $conversation->latestMessage;
-                $lastReadAt = optional($conversation->participants->first()?->pivot)->last_read_at;
+        if ($hasConversationTables) {
+            $unreadConversationCount = \App\Models\Conversation::query()
+                ->whereHas('participants', fn ($query) => $query->where('users.id', auth()->id()))
+                ->with([
+                    'latestMessage',
+                    'participants' => fn ($query) => $query->where('users.id', auth()->id()),
+                ])
+                ->get()
+                ->filter(function (\App\Models\Conversation $conversation) {
+                    $latestMessage = $conversation->latestMessage;
+                    $lastReadAt = optional($conversation->participants->first()?->pivot)->last_read_at;
 
-                return $latestMessage
-                    && (int) $latestMessage->sender_id !== (int) auth()->id()
-                    && (! $lastReadAt || $latestMessage->created_at?->gt($lastReadAt));
-            })
-            ->count();
+                    return $latestMessage
+                        && (int) $latestMessage->sender_id !== (int) auth()->id()
+                        && (! $lastReadAt || $latestMessage->created_at?->gt($lastReadAt));
+                })
+                ->count();
+        }
 
-        $unreadForumNotificationCount = \App\Models\ForumNotification::query()
-            ->where('user_id', auth()->id())
-            ->whereNull('read_at')
-            ->count();
+        if ($hasForumNotificationsTable) {
+            $unreadForumNotificationCount = \App\Models\ForumNotification::query()
+                ->where('user_id', auth()->id())
+                ->whereNull('read_at')
+                ->count();
+        }
     }
 @endphp
 <body class="bg-[#FAF0E6]">

@@ -17,7 +17,7 @@ class AnalysisPageTest extends TestCase
         $this->actingAs($user)
             ->get(route('study.analysis'))
             ->assertOk()
-            ->assertSee('Personal Learning Analysis Details')
-            ->assertSee('Capability Diagnosis Analysis');
+            ->assertSee('Learning Analysis')
+            ->assertSee('Listening Weak Spots');
     }
 }
