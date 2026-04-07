@@ -1,65 +1,120 @@
 @extends('layouts.app')
 
-@section('title', 'Library - EAPlus')
+@section('title', 'Learning - EAPlus')
 
 @section('content')
 <div class="max-w-[1440px] mx-auto px-5 md:px-8 xl:px-12">
     <div class="mb-8">
-        <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">Library</h1>
+        <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">Learning</h1>
         <p class="text-[#6B3D2E] mt-1">Browse all available academic articles</p>
     </div>
 
-    <div class="mb-8 bg-white border-2 border-[#6B3D2E] rounded-lg p-4 shadow-md">
-        <form method="GET" action="{{ route('articles.index') }}" class="flex flex-wrap items-center gap-4">
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                    type="checkbox"
-                    name="favorites"
-                    value="1"
-                    {{ request('favorites') == '1' ? 'checked' : '' }}
-                    class="w-4 h-4 text-[#6B3D2E] border-2 border-[#6B3D2E] rounded focus:ring-[#6B3D2E]"
-                >
-                <span class="text-[#4A2C2A] font-medium">My Favorites</span>
-            </label>
+    @php
+        $skill = $skill ?? request('skill');
+        $skillLabels = [
+            'listening' => 'Listening',
+            'speaking' => 'Speaking',
+            'reading' => 'Reading',
+            'writing' => 'Writing',
+        ];
+        $currentSkill = in_array($skill, array_keys($skillLabels), true) ? $skill : null;
+    @endphp
 
-            <div class="flex-1 min-w-[200px]">
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Search articles..."
-                    value="{{ request('search') }}"
-                    class="w-full px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] placeholder-[#6B3D2E]/50 focus:outline-none focus:border-[#8B4D3A]"
-                >
+    <div class="space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+            <div class="shrink-0 rounded-2xl bg-[#4A2C2A] text-[#F5E6D3] px-4 py-3 lg:px-5 lg:py-4">
+                <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#D7BE8A]">Skills</div>
+                <div class="mt-1 text-sm">Choose what to practice</div>
             </div>
 
-            <select name="difficulty" class="px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] focus:outline-none focus:border-[#8B4D3A]">
-                <option value="">All Difficulties</option>
-                <option value="1" {{ request('difficulty') == 1 ? 'selected' : '' }}>Level 1</option>
-                <option value="2" {{ request('difficulty') == 2 ? 'selected' : '' }}>Level 2</option>
-                <option value="3" {{ request('difficulty') == 3 ? 'selected' : '' }}>Level 3</option>
-            </select>
+            <div class="flex flex-wrap gap-3">
+                @foreach($skillLabels as $value => $label)
+                    @php
+                        $isActive = $currentSkill === $value || (!$currentSkill && $value === 'listening');
+                        $query = array_merge(request()->query(), ['skill' => $value]);
+                    @endphp
+                    <a href="{{ route('articles.index', $query) }}"
+                       class="px-4 py-3 rounded-xl border text-sm font-semibold transition
+                              {{ $isActive
+                                    ? 'bg-[#4A2C2A] text-[#F5E6D3] border-[#4A2C2A] shadow-md'
+                                    : 'bg-white text-[#4A2C2A] border-[#D9C7B5] hover:border-[#8B4D3A] hover:bg-[#FBF7F1]' }}">
+                        {{ $label }}
+                    </a>
+                @endforeach
+            </div>
+        </div>
 
-            <select name="sort" class="px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] focus:outline-none focus:border-[#8B4D3A]">
-                <option value="newest" {{ request('sort') == 'newest' || !request('sort') ? 'selected' : '' }}>Newest First</option>
-                <option value="oldest" {{ request('sort') == 'oldest' ? 'selected' : '' }}>Oldest First</option>
-                <option value="title" {{ request('sort') == 'title' ? 'selected' : '' }}>Title A-Z</option>
-                <option value="words" {{ request('sort') == 'words' ? 'selected' : '' }}>Word Count</option>
-            </select>
+        <div class="bg-white border-2 border-[#6B3D2E] rounded-lg p-4 shadow-md">
+                <form method="GET" action="{{ route('articles.index') }}" class="flex flex-wrap items-center gap-4">
+                    <input type="hidden" name="skill" value="{{ $currentSkill ?? 'listening' }}">
 
-            <button type="submit" class="px-6 py-2 bg-[#6B3D2E] text-[#F5E6D3] rounded-lg font-medium hover:bg-[#8B4D3A] transition">
-                Search
-            </button>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            name="favorites"
+                            value="1"
+                            {{ request('favorites') == '1' ? 'checked' : '' }}
+                            class="w-4 h-4 text-[#6B3D2E] border-2 border-[#6B3D2E] rounded focus:ring-[#6B3D2E]"
+                        >
+                        <span class="text-[#4A2C2A] font-medium">My Favorites</span>
+                    </label>
 
-            @if(request('search') || request('difficulty') || request('favorites'))
-                <a href="{{ route('articles.index') }}" class="px-4 py-2 text-[#6B3D2E] hover:text-[#8B4D3A] transition">
-                    Clear
-                </a>
-            @endif
-        </form>
-    </div>
+                    <div class="flex-1 min-w-[200px]">
+                        <input
+                            type="text"
+                            name="search"
+                            placeholder="Search articles..."
+                            value="{{ request('search') }}"
+                            class="w-full px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] placeholder-[#6B3D2E]/50 focus:outline-none focus:border-[#8B4D3A]"
+                        >
+                    </div>
 
-    @if($articles->count() > 0)
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <select name="difficulty" class="px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] focus:outline-none focus:border-[#8B4D3A]">
+                        <option value="">All Difficulties</option>
+                        <option value="1" {{ request('difficulty') == 1 ? 'selected' : '' }}>Level 1</option>
+                        <option value="2" {{ request('difficulty') == 2 ? 'selected' : '' }}>Level 2</option>
+                        <option value="3" {{ request('difficulty') == 3 ? 'selected' : '' }}>Level 3</option>
+                    </select>
+
+                    <select name="sort" class="px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] focus:outline-none focus:border-[#8B4D3A]">
+                        <option value="newest" {{ request('sort') == 'newest' || !request('sort') ? 'selected' : '' }}>Newest First</option>
+                        <option value="oldest" {{ request('sort') == 'oldest' ? 'selected' : '' }}>Oldest First</option>
+                        <option value="title" {{ request('sort') == 'title' ? 'selected' : '' }}>Title A-Z</option>
+                        <option value="words" {{ request('sort') == 'words' ? 'selected' : '' }}>Word Count</option>
+                    </select>
+
+                    <button type="submit" class="px-6 py-2 bg-[#6B3D2E] text-[#F5E6D3] rounded-lg font-medium hover:bg-[#8B4D3A] transition">
+                        Search
+                    </button>
+
+                    @if(request('search') || request('difficulty') || request('favorites'))
+                        <a href="{{ route('articles.index', ['skill' => $currentSkill ?? 'listening']) }}" class="px-4 py-2 text-[#6B3D2E] hover:text-[#8B4D3A] transition">
+                            Clear
+                        </a>
+                    @endif
+                </form>
+        </div>
+
+        @php
+            $effectiveSkill = $currentSkill ?? 'listening';
+            $skillRouteMap = [
+                'listening' => 'articles.listening',
+                'speaking' => 'articles.speaking',
+                'reading' => 'articles.reading',
+                'writing' => 'articles.writing',
+            ];
+            $skillCtaLabel = [
+                'listening' => 'Start Listening',
+                'speaking' => 'Start Speaking',
+                'reading' => 'Start Reading',
+                'writing' => 'Start Writing',
+            ];
+            $targetRouteName = $skillRouteMap[$effectiveSkill] ?? 'articles.show';
+            $ctaText = $skillCtaLabel[$effectiveSkill] ?? 'Open Article';
+        @endphp
+
+        @if($articles->count() > 0)
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($articles as $article)
                 <article class="bg-white border-2 border-[#6B3D2E] rounded-lg p-6 shadow-md hover:shadow-xl transition-all duration-200 hover:-translate-y-1 group flex flex-col h-full">
                     <div class="flex items-center justify-between mb-4">
@@ -92,9 +147,9 @@
                     @endif
 
                     <div class="flex items-center justify-between pt-4 border-t border-[#6B3D2E]/20 mt-auto">
-                        <a href="{{ route('articles.show', $article) }}"
+                        <a href="{{ route($targetRouteName, $article) }}"
                            class="inline-flex items-center gap-2 px-4 py-2 bg-[#6B3D2E] text-[#F5E6D3] rounded-lg font-medium hover:bg-[#8B4D3A] transition text-sm group-hover:shadow-md">
-                            Read Article
+                            {{ $ctaText }}
                             <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                             </svg>
@@ -113,13 +168,13 @@
                     </div>
                 </article>
             @endforeach
-        </div>
+            </div>
 
-        <div class="mt-12 flex justify-center">
-            {{ $articles->appends(request()->query())->links() }}
-        </div>
-    @else
-        <div class="text-center py-20">
+            <div class="mt-12 flex justify-center">
+                {{ $articles->appends(request()->query())->links() }}
+            </div>
+        @else
+            <div class="text-center py-20">
             <div class="w-24 h-24 bg-[#6B3D2E]/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg class="w-12 h-12 text-[#6B3D2E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
@@ -148,8 +203,9 @@
                     Clear Filters
                 </a>
             @endif
-        </div>
-    @endif
+            </div>
+        @endif
+    </div>
 </div>
 @endsection
 

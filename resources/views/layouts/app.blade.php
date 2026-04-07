@@ -48,7 +48,7 @@
                     </a>
                     <a href="{{ route('articles.index') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('articles.*') ? 'bg-[#6B3D2E]' : '' }}">
-                        Library
+                        Learning
                     </a>
                     <a href="{{ route('companion.index') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('companion.*') ? 'bg-[#6B3D2E]' : '' }}">

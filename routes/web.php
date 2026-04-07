@@ -217,6 +217,15 @@ Route::patch('/plans/{plan}', function (Request $request, UserPlan $plan) {
 Route::get('/articles', function (Request $request) {
     $query = Article::query();
 
+    $skill = $request->get('skill');
+    $validSkills = ['listening', 'speaking', 'reading', 'writing'];
+
+    if ($skill && in_array($skill, $validSkills, true)) {
+        $query->whereHas('exercises', function ($q) use ($skill) {
+            $q->where('type', $skill);
+        });
+    }
+
     if ($request->filled('favorites') && $request->favorites === '1') {
         $query->join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
             ->where('user_favorites.user_id', auth()->id());
@@ -256,7 +265,11 @@ Route::get('/articles', function (Request $request) {
         ->pluck('article_id')
         ->toArray();
 
-    return view('articles.index', compact('articles', 'favoritedArticleIds'));
+    return view('articles.index', [
+        'articles' => $articles,
+        'favoritedArticleIds' => $favoritedArticleIds,
+        'skill' => $skill,
+    ]);
 })->name('articles.index')->middleware('auth');
 
 Route::get('/articles/{article}', [ArticleController::class, 'show'])->name('articles.show')->middleware('auth');
