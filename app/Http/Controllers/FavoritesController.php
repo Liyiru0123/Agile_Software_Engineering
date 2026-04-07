@@ -68,10 +68,16 @@ class FavoritesController extends Controller
             UserPlan::query()->updateOrCreate(
                 [
                     'user_id' => auth()->id(),
+                    'plan_kind' => 'article',
                     'article_id' => $articleId,
                     'plan_date' => $payload['plan_date'],
                 ],
-                ['status' => 'pending']
+                [
+                    'title' => null,
+                    'skill_type' => null,
+                    'target_count' => null,
+                    'status' => 'pending',
+                ]
             );
         }
 
