@@ -12,10 +12,8 @@
     @php
         $skill = $skill ?? request('skill');
         $skillLabels = [
-            'listening' => 'Listening',
+            'listening' => 'Listening Hub',
             'speaking' => 'Speaking',
-            'reading' => 'Reading',
-            'writing' => 'Writing',
         ];
         $currentSkill = in_array($skill, array_keys($skillLabels), true) ? $skill : null;
     @endphp
@@ -100,14 +98,10 @@
             $skillRouteMap = [
                 'listening' => 'articles.listening',
                 'speaking' => 'articles.speaking',
-                'reading' => 'articles.reading',
-                'writing' => 'articles.writing',
             ];
             $skillCtaLabel = [
-                'listening' => 'Start Listening',
+                'listening' => 'Start Listening Hub',
                 'speaking' => 'Start Speaking',
-                'reading' => 'Start Reading',
-                'writing' => 'Start Writing',
             ];
             $targetRouteName = $skillRouteMap[$effectiveSkill] ?? 'articles.show';
             $ctaText = $skillCtaLabel[$effectiveSkill] ?? 'Open Article';
