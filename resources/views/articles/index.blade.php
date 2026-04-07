@@ -4,43 +4,21 @@
 
 @section('content')
 <div class="max-w-[1440px] mx-auto px-5 md:px-8 xl:px-12">
-    <div class="mb-8">
-        <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">Learning</h1>
-        <p class="text-[#6B3D2E] mt-1">Browse all available academic articles</p>
-    </div>
-
     @php
         $skill = $skill ?? request('skill');
-        $skillLabels = [
-            'listening' => 'Listening Hub',
-            'speaking' => 'Speaking',
-        ];
-        $currentSkill = in_array($skill, array_keys($skillLabels), true) ? $skill : null;
+        $currentSkill = in_array($skill, ['listening', 'speaking'], true) ? $skill : 'listening';
+        $pageHeading = $currentSkill === 'speaking' ? 'Speaking' : 'Listening Hub';
+        $pageSubheading = $currentSkill === 'speaking'
+            ? 'Browse speaking-ready articles and practice prompts'
+            : 'Browse listening-ready articles and transcript tasks';
     @endphp
 
-    <div class="space-y-6">
-        <div class="flex flex-col lg:flex-row lg:items-end gap-4">
-            <div class="shrink-0 rounded-2xl bg-[#4A2C2A] text-[#F5E6D3] px-4 py-3 lg:px-5 lg:py-4">
-                <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#D7BE8A]">Skills</div>
-                <div class="mt-1 text-sm">Choose what to practice</div>
-            </div>
+    <div class="mb-8">
+        <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">{{ $pageHeading }}</h1>
+        <p class="text-[#6B3D2E] mt-1">{{ $pageSubheading }}</p>
+    </div>
 
-            <div class="flex flex-wrap gap-3">
-                @foreach($skillLabels as $value => $label)
-                    @php
-                        $isActive = $currentSkill === $value || (!$currentSkill && $value === 'listening');
-                        $query = array_merge(request()->query(), ['skill' => $value]);
-                    @endphp
-                    <a href="{{ route('articles.index', $query) }}"
-                       class="px-4 py-3 rounded-xl border text-sm font-semibold transition
-                              {{ $isActive
-                                    ? 'bg-[#4A2C2A] text-[#F5E6D3] border-[#4A2C2A] shadow-md'
-                                    : 'bg-white text-[#4A2C2A] border-[#D9C7B5] hover:border-[#8B4D3A] hover:bg-[#FBF7F1]' }}">
-                        {{ $label }}
-                    </a>
-                @endforeach
-            </div>
-        </div>
+    <div class="space-y-6">
 
         <div class="bg-white border-2 border-[#6B3D2E] rounded-lg p-4 shadow-md">
                 <form method="GET" action="{{ route('articles.index') }}" class="flex flex-wrap items-center gap-4">
@@ -74,6 +52,13 @@
                         <option value="3" {{ request('difficulty') == 3 ? 'selected' : '' }}>Level 3</option>
                     </select>
 
+                    <select name="progress" class="px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] focus:outline-none focus:border-[#8B4D3A]">
+                        <option value="">All Progress</option>
+                        <option value="not_started" {{ request('progress') == 'not_started' ? 'selected' : '' }}>Not Started</option>
+                        <option value="in_progress" {{ request('progress') == 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                        <option value="completed" {{ request('progress') == 'completed' ? 'selected' : '' }}>Completed</option>
+                    </select>
+
                     <select name="sort" class="px-4 py-2 bg-[#FAF0E6] border-2 border-[#6B3D2E] rounded-lg text-[#4A2C2A] focus:outline-none focus:border-[#8B4D3A]">
                         <option value="newest" {{ request('sort') == 'newest' || !request('sort') ? 'selected' : '' }}>Newest First</option>
                         <option value="oldest" {{ request('sort') == 'oldest' ? 'selected' : '' }}>Oldest First</option>
@@ -85,7 +70,7 @@
                         Search
                     </button>
 
-                    @if(request('search') || request('difficulty') || request('favorites'))
+                    @if(request('search') || request('difficulty') || request('favorites') || request('progress'))
                         <a href="{{ route('articles.index', ['skill' => $currentSkill ?? 'listening']) }}" class="px-4 py-2 text-[#6B3D2E] hover:text-[#8B4D3A] transition">
                             Clear
                         </a>
@@ -112,9 +97,20 @@
             @foreach($articles as $article)
                 <article class="bg-white border-2 border-[#6B3D2E] rounded-lg p-6 shadow-md hover:shadow-xl transition-all duration-200 hover:-translate-y-1 group flex flex-col h-full">
                     <div class="flex items-center justify-between mb-4">
-                        <span class="px-3 py-1 bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs rounded-full font-bold border border-[#6B3D2E]/30 whitespace-nowrap">
-                            Level {{ $article->difficulty }}
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <span class="px-3 py-1 bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs rounded-full font-bold border border-[#6B3D2E]/30 whitespace-nowrap">
+                                Level {{ $article->difficulty }}
+                            </span>
+                            @if(!empty($completedArticleIds) && in_array($article->id, $completedArticleIds))
+                                <span class="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs rounded-full font-bold border border-emerald-300 whitespace-nowrap">
+                                    Completed
+                                </span>
+                            @elseif(!empty($inProgressArticleIds) && in_array($article->id, $inProgressArticleIds))
+                                <span class="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-bold border border-amber-300 whitespace-nowrap">
+                                    In Progress
+                                </span>
+                            @endif
+                        </div>
                         <span class="text-xs text-gray-500 flex items-center gap-1 whitespace-nowrap ml-2">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>

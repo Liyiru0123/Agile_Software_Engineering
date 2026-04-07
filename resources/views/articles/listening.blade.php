@@ -5,9 +5,6 @@
 @section('content')
 <div class="min-h-screen bg-[#F6F0E8] py-10">
     <div class="max-w-5xl mx-auto px-6">
-        <a href="{{ route('articles.show', $article) }}" class="inline-flex items-center text-sm text-[#6B3D2E] hover:text-[#4A2C2A] mb-6">
-            Back to Article
-        </a>
 
         <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8 lg:p-10">
             <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -396,9 +393,10 @@ const listeningEvaluateUrl = @json(route('articles.listening.evaluate', $article
 const readingSubmitUrl = @json(route('articles.reading.submit', $article));
 const writingEvaluateUrl = @json(route('articles.writing.evaluate', $article));
 const listeningExercise = @json($listeningExercise);
-const latestSubmission = @json($listeningExercise['latest_submission'] ?? null);
 const listeningSummaryTask = @json($listeningSummaryTask);
+const latestSummaryResult = @json($listeningSummaryTask['latest_result'] ?? null);
 const listeningReadingQuestions = @json($listeningReadingQuestions ?? []);
+const latestReadingResult = @json($latestReadingResult ?? null);
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const startedAt = Date.now();
 const progressStorageKey = `listening-hub-progress-${@json($article->id)}`;
@@ -426,56 +424,31 @@ function initDictation() {
         input.addEventListener('input', () => syncInputWidth(input));
     });
 
-    if (latestSubmission?.result) {
-        renderResults(latestSubmission.result);
-    }
-
-    if (!completeBtn || !listeningExercise?.id) {
-        return;
-    }
-
-    completeBtn.addEventListener('click', async () => {
-        const answers = { items: {} };
+    function setDictationEditable(editable) {
         blankInputs.forEach((input) => {
-            answers.items[input.dataset.answerId] = input.value.trim();
+            input.disabled = !editable;
         });
 
-        completeBtn.disabled = true;
-        completeBtn.textContent = 'Checking...';
-
-        try {
-            const response = await fetch(listeningEvaluateUrl, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({
-                    exercise_id: listeningExercise.id,
-                    answers,
-                    time_spent: Math.round((Date.now() - startedAt) / 1000),
-                }),
-            });
-
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.message || 'Unable to check answers right now.');
-            }
-
-            renderResults(data.result);
-        } catch (error) {
-            summaryPanel?.classList.remove('hidden');
-            if (summaryText) {
-                summaryText.textContent = error.message || 'Unable to check answers right now.';
-            }
-        } finally {
+        if (completeBtn) {
+            completeBtn.textContent = editable ? 'Complete' : 'Redo';
+            completeBtn.dataset.mode = editable ? 'submit' : 'redo';
             completeBtn.disabled = false;
-            completeBtn.textContent = 'Complete';
         }
-    });
+    }
 
-    function renderResults(result) {
+    function clearDictationResultUI() {
+        if (summaryPanel) {
+            summaryPanel.classList.add('hidden');
+        }
+
+        document.querySelectorAll('[data-result-id]').forEach((box) => {
+            box.classList.add('hidden');
+            box.classList.remove('correct', 'incorrect');
+            box.textContent = '';
+        });
+    }
+
+    function applyDictationResult(result) {
         if (!result || !scoreValue || !summaryText || !summaryPanel) {
             return;
         }
@@ -503,7 +476,66 @@ function initDictation() {
         });
 
         markProgress('dictation', true);
+        setDictationEditable(false);
     }
+
+    if (listeningExercise?.latest_submission?.result) {
+        applyDictationResult(listeningExercise.latest_submission.result);
+    } else {
+        setDictationEditable(true);
+    }
+
+    if (!completeBtn || !listeningExercise?.id) {
+        return;
+    }
+
+    completeBtn.addEventListener('click', async () => {
+        if (completeBtn.dataset.mode === 'redo') {
+            clearDictationResultUI();
+            setDictationEditable(true);
+            markProgress('dictation', false);
+            return;
+        }
+
+        const answers = { items: {} };
+        blankInputs.forEach((input) => {
+            answers.items[input.dataset.answerId] = input.value.trim();
+        });
+
+        completeBtn.disabled = true;
+        completeBtn.textContent = 'Checking...';
+
+        try {
+            const response = await fetch(listeningEvaluateUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    exercise_id: listeningExercise.id,
+                    answers,
+                    time_spent: Math.round((Date.now() - startedAt) / 1000),
+                }),
+            });
+
+            const data = await response.json();
+            applyDictationResult(data.result);
+            if (!response.ok) {
+                throw new Error(data.message || 'Unable to check answers right now.');
+            }
+
+            renderResults(data.result);
+        } catch (error) {
+            summaryPanel?.classList.remove('hidden');
+            if (summaryText) {
+                summaryText.textContent = error.message || 'Unable to check answers right now.';
+            }
+            completeBtn.disabled = false;
+            completeBtn.textContent = 'Complete';
+        }
+    });
 }
 
 function initMcq() {
@@ -533,7 +565,96 @@ function initMcq() {
         `;
     }).join('');
 
+    function setMcqEditable(editable) {
+        listEl.querySelectorAll('input[type="radio"]').forEach((input) => {
+            input.disabled = !editable;
+            if (editable) {
+                input.checked = false;
+            }
+        });
+
+        if (submitBtn) {
+            submitBtn.textContent = editable ? 'Submit' : 'Redo';
+            submitBtn.dataset.mode = editable ? 'submit' : 'redo';
+            submitBtn.disabled = false;
+        }
+    }
+
+    function clearMcqResultUI() {
+        scoreEl.classList.add('hidden');
+        scoreEl.innerHTML = '';
+
+        listeningReadingQuestions.forEach((q) => {
+            const card = document.getElementById(`mcq-card-${q.id}`);
+            const resultEl = document.getElementById(`mcq-result-${q.id}`);
+            if (card) {
+                card.classList.remove('correct', 'wrong');
+            }
+            if (resultEl) {
+                resultEl.classList.add('hidden');
+                resultEl.innerHTML = '';
+            }
+        });
+    }
+
+    function applyMcqResult(data) {
+        (data.results || []).forEach((result) => {
+            const card = document.getElementById(`mcq-card-${result.question_id}`);
+            const resultEl = document.getElementById(`mcq-result-${result.question_id}`);
+            if (!card || !resultEl) {
+                return;
+            }
+
+            card.classList.remove('correct', 'wrong');
+            card.classList.add(result.is_correct ? 'correct' : 'wrong');
+
+            if (result.source_anchor) {
+                sourceQuestionMap[result.source_anchor] = result.question_id;
+            }
+
+            if (result.your_answer) {
+                const checked = document.querySelector(`input[name="mcq_${result.question_id}"][value="${result.your_answer}"]`);
+                if (checked) {
+                    checked.checked = true;
+                }
+            }
+
+            const locateButton = result.source_anchor
+                ? `<a href="#" class="mt-2 inline-block text-[#6B3D2E] underline locate-source-btn" data-anchor="${escapeHtml(result.source_anchor)}">Locate in Transcript</a>`
+                : '';
+
+            resultEl.classList.remove('hidden');
+            resultEl.innerHTML = `<strong>Correct:</strong> ${escapeHtml(result.correct_answer)}. ${escapeHtml(result.correct_option_text || '')}<br><strong>Analysis:</strong> ${escapeHtml(result.explanation || '')}${locateButton}`;
+        });
+
+        scoreEl.classList.remove('hidden');
+        scoreEl.innerHTML = `<div class="text-lg font-bold">Dictation Score: ${data.score}</div><div class="text-sm mt-1">Correct ${data.correct_count} / ${data.total}</div>`;
+
+        document.querySelectorAll('.locate-source-btn').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                locateSentence(button.dataset.anchor);
+            });
+        });
+
+        markProgress('mcq', true);
+        setMcqEditable(false);
+    }
+
+    if (latestReadingResult?.results?.length) {
+        applyMcqResult(latestReadingResult);
+    } else {
+        setMcqEditable(true);
+    }
+
     submitBtn.addEventListener('click', async () => {
+        if (submitBtn.dataset.mode === 'redo') {
+            clearMcqResultUI();
+            setMcqEditable(true);
+            markProgress('mcq', false);
+            return;
+        }
+
         const payload = listeningReadingQuestions.map((q) => {
             const checked = document.querySelector(`input[name="mcq_${q.id}"]:checked`);
             return { question_id: q.id, selected: checked ? checked.value : null };
@@ -554,45 +675,7 @@ function initMcq() {
             });
 
             const data = await res.json();
-
-            (data.results || []).forEach((result) => {
-                const card = document.getElementById(`mcq-card-${result.question_id}`);
-                const resultEl = document.getElementById(`mcq-result-${result.question_id}`);
-                if (!card || !resultEl) {
-                    return;
-                }
-
-                card.classList.remove('correct', 'wrong');
-                card.classList.add(result.is_correct ? 'correct' : 'wrong');
-
-                if (result.source_anchor) {
-                    sourceQuestionMap[result.source_anchor] = result.question_id;
-                }
-
-                const locateButton = result.source_anchor
-                    ? `<a href="#" class="mt-2 inline-block text-[#6B3D2E] underline locate-source-btn" data-anchor="${escapeHtml(result.source_anchor)}">Locate in Transcript</a>`
-                    : '';
-
-                resultEl.classList.remove('hidden');
-                resultEl.innerHTML = `<strong>Correct:</strong> ${escapeHtml(result.correct_answer)}. ${escapeHtml(result.correct_option_text || '')}<br><strong>Analysis:</strong> ${escapeHtml(result.explanation || '')}${locateButton}`;
-            });
-
-            scoreEl.classList.remove('hidden');
-            scoreEl.innerHTML = `<div class="text-lg font-bold">Dictation Score: ${data.score}</div><div class="text-sm mt-1">Correct ${data.correct_count} / ${data.total}</div>`;
-
-            document.querySelectorAll('.locate-source-btn').forEach((button) => {
-                button.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    locateSentence(button.dataset.anchor);
-                });
-            });
-
-            listEl.querySelectorAll('input[type="radio"]').forEach((input) => {
-                input.disabled = true;
-            });
-
-            submitBtn.textContent = 'Submitted';
-            markProgress('mcq', true);
+            applyMcqResult(data);
         } catch (error) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Submit';
@@ -613,10 +696,60 @@ function initSummary() {
         return;
     }
 
+    function setSummaryEditable(editable) {
+        textarea.disabled = !editable;
+        submitBtn.textContent = editable ? 'Submit' : 'Redo';
+        submitBtn.dataset.mode = editable ? 'submit' : 'redo';
+        submitBtn.disabled = false;
+    }
+
+    function clearSummaryResultUI() {
+        resultEl.classList.add('hidden');
+        resultScoreEl.textContent = '0';
+        resultTextEl.textContent = '';
+        statusEl.textContent = '';
+    }
+
+    function applySummaryResult(result, submittedText = null) {
+        if (!result) {
+            return;
+        }
+
+        resultEl.classList.remove('hidden');
+        resultScoreEl.textContent = Number(result.score || 0).toFixed(1);
+        resultTextEl.textContent = result.summary || 'Summary evaluated.';
+
+        if (submittedText && !textarea.value.trim()) {
+            textarea.value = submittedText;
+        }
+
+        countEl.textContent = `Word count: ${countWords(textarea.value)}`;
+        statusEl.textContent = 'Loaded your latest summary result.';
+        markProgress('summary', true);
+        setSummaryEditable(false);
+    }
+
+    if (listeningSummaryTask.latest_result) {
+        applySummaryResult(
+            listeningSummaryTask.latest_result,
+            listeningSummaryTask.latest_result.submitted_text || null
+        );
+    } else {
+        setSummaryEditable(true);
+    }
+
     textarea.addEventListener('input', updateWordCount);
     updateWordCount();
 
     submitBtn.addEventListener('click', async () => {
+        if (submitBtn.dataset.mode === 'redo') {
+            clearSummaryResultUI();
+            setSummaryEditable(true);
+            statusEl.textContent = 'You can submit a new version now.';
+            markProgress('summary', false);
+            return;
+        }
+
         const draft = textarea.value.trim();
 
         if (countWords(draft) < 10) {
@@ -652,9 +785,9 @@ function initSummary() {
             resultTextEl.textContent = data.result.summary || 'Summary evaluated.';
             statusEl.textContent = 'Summary submitted successfully.';
             markProgress('summary', true);
+            setSummaryEditable(false);
         } catch (error) {
             statusEl.textContent = 'Unable to submit summary right now.';
-        } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Submit';
         }
@@ -947,7 +1080,6 @@ function countWords(text) {
 function markProgress(key, value) {
     progressState[key] = value;
     persistProgress();
-    renderProgress();
 }
 
 function renderProgress() {

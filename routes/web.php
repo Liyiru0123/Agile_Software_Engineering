@@ -279,9 +279,42 @@ Route::get('/articles', function (Request $request) {
         ->pluck('article_id')
         ->toArray();
 
+    $completedArticleIds = Submission::query()
+        ->join('exercises', 'submissions.exercise_id', '=', 'exercises.id')
+        ->where('submissions.user_id', auth()->id())
+        ->whereIn('submissions.article_id', $articles->pluck('id'))
+        ->whereIn('exercises.type', ['listening', 'reading', 'writing'])
+        ->groupBy('submissions.article_id')
+        ->havingRaw('COUNT(DISTINCT exercises.type) >= 3')
+        ->pluck('submissions.article_id')
+        ->toArray();
+
+    $inProgressArticleIds = Submission::query()
+        ->join('exercises', 'submissions.exercise_id', '=', 'exercises.id')
+        ->where('submissions.user_id', auth()->id())
+        ->whereIn('submissions.article_id', $articles->pluck('id'))
+        ->whereIn('exercises.type', ['listening', 'reading', 'writing'])
+        ->groupBy('submissions.article_id')
+        ->havingRaw('COUNT(DISTINCT exercises.type) >= 1')
+        ->havingRaw('COUNT(DISTINCT exercises.type) < 3')
+        ->pluck('submissions.article_id')
+        ->toArray();
+
+    $progress = $request->get('progress');
+    if ($progress === 'completed') {
+        $articles->setCollection($articles->getCollection()->whereIn('id', $completedArticleIds)->values());
+    } elseif ($progress === 'in_progress') {
+        $articles->setCollection($articles->getCollection()->whereIn('id', $inProgressArticleIds)->values());
+    } elseif ($progress === 'not_started') {
+        $startedIds = array_unique(array_merge($completedArticleIds, $inProgressArticleIds));
+        $articles->setCollection($articles->getCollection()->whereNotIn('id', $startedIds)->values());
+    }
+
     return view('articles.index', [
         'articles' => $articles,
         'favoritedArticleIds' => $favoritedArticleIds,
+        'completedArticleIds' => $completedArticleIds,
+        'inProgressArticleIds' => $inProgressArticleIds,
         'skill' => $skill,
     ]);
 })->name('articles.index')->middleware('auth');
