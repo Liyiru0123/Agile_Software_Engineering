@@ -6,6 +6,8 @@ use App\ListeningExerciseService;
 use App\Models\Article;
 use App\Models\Exercise;
 use App\Services\CompanionService;
+use App\Services\ReadingExerciseService;
+use App\WritingExerciseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;

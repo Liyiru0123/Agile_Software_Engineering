@@ -72,7 +72,7 @@
                     <div class="text-xs uppercase tracking-[0.25em] text-[#D7BE8A] mb-3">Training Hub</div>
                     <h2 class="text-2xl font-bold mb-2">Choose a skill to train</h2>
                     <p class="text-sm text-[#F5E6D3]/80 leading-6">
-                        Start with the full article, then switch into listening, speaking, reading, or writing practice. The listening page already supports AI exercise generation, scoring, and speech recognition.
+                        Start with the full article, then switch into the integrated listening hub or speaking practice.
                     </p>
                 </div>
 

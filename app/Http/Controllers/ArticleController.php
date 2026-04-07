@@ -59,6 +59,17 @@ class ArticleController extends Controller
             request()->user()?->id
         );
 
+        $writingPayload = $this->writingExerciseService->buildPagePayload(
+            article: $article,
+            userId: auth()->id(),
+        );
+        $writingTasks = $writingPayload['writingTasks'] ?? [];
+
+        $data['listeningSummaryTask'] = collect($writingTasks)->firstWhere('task_type', 'summary_response')
+            ?? ($writingTasks[0] ?? null);
+        $data['listeningReadingQuestions'] = $this->readingExerciseService->getPublicQuestions($article);
+        $data['articleSentenceMap'] = $this->buildArticleSentenceMap($data['paragraphs']);
+
         return view('articles.listening', $data);
     }
 
@@ -250,8 +261,8 @@ class ArticleController extends Controller
     {
         return [
             [
-                'title' => 'Listening',
-                'description' => 'Practice listening with article-based fill-in-the-blank tasks, discourse markers, and focused comprehension feedback.',
+                'title' => 'Listening Hub',
+                'description' => 'Complete one integrated flow: fill-in-the-blank dictation, listening multiple-choice, summary writing, and transcript review.',
                 'status' => $article->audio_url ? 'Audio ready' : 'Text preview only',
                 'route' => route('articles.listening', $article),
                 'cta' => 'Start listening',
@@ -262,20 +273,6 @@ class ArticleController extends Controller
                 'status' => 'Practice prompts ready',
                 'route' => route('articles.speaking', $article),
                 'cta' => 'Start speaking',
-            ],
-            [
-                'title' => 'Reading',
-                'description' => 'Read the full text, identify key vocabulary, and answer comprehension questions for close reading practice.',
-                'status' => 'Reading tasks ready',
-                'route' => route('articles.reading', $article),
-                'cta' => 'Start reading',
-            ],
-            [
-                'title' => 'Writing',
-                'description' => 'Complete summary and response writing tasks based on the article with word-count and structure guidance.',
-                'status' => 'Writing prompt ready',
-                'route' => route('articles.writing', $article),
-                'cta' => 'Start writing',
             ],
         ];
     }
