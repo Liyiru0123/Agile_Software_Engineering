@@ -226,6 +226,7 @@ Route::get('/', function () {
 
 Route::get('/dashboard', fn () => redirect()->route('home'))->name('dashboard')->middleware('auth');
 Route::get('/analysis/study', [AnalysisController::class, 'studyAnalysis'])->name('study.analysis')->middleware('auth');
+Route::view('/game', 'game.index')->name('game.index')->middleware('auth');
 
 Route::delete('/plans/{plan}', function (UserPlan $plan) {
     if ($plan->user_id !== auth()->id()) {
