@@ -18,6 +18,7 @@ use App\WritingExerciseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -126,8 +127,8 @@ class ArticleController extends Controller
                 ],
                 [
                     'title' => 'AI Conversation',
-                    'description' => 'Reserved for the upcoming Live2D AI dialogue mode. This page is kept as an integration entry for your teammate.',
-                    'status' => 'Integration placeholder',
+                    'description' => 'Talk to the centered Live2D companion with text or browser voice input. Replies appear on-screen as subtitles and can be read aloud.',
+                    'status' => 'Available now',
                     'route' => route('speaking.live2d'),
                     'cta' => 'Open AI Conversation',
                 ],
@@ -145,31 +146,87 @@ class ArticleController extends Controller
     public function speakingLive2d(): View
     {
         $live2dInterface = [
-            'status' => 'pending_integration',
+            'status' => 'available',
             'conversation_endpoint' => route('speaking.live2d.interface'),
             'audio_input_supported' => true,
             'message_input_supported' => true,
             'notes' => [
-                'This page is a reserved integration entry for the Live2D AI conversation feature.',
-                'Another team member can connect the frontend avatar and dialogue logic to the provided interface endpoint.',
+                'Voice capture uses the browser SpeechRecognition API first to keep running costs low.',
+                'Replies are generated from text input and shown as subtitles under the centered Live2D character.',
             ],
         ];
 
         return view('speaking.live2d', compact('live2dInterface'));
     }
 
-    public function speakingLive2dInterface(): JsonResponse
+    public function speakingLive2dInterface(Request $request): JsonResponse
     {
+        $sessionKey = 'live2d_ai_dialogue.history';
+
+        if ($request->isMethod('get')) {
+            return response()->json([
+                'status' => 'available',
+                'conversation_mode' => 'live2d_ai_dialogue',
+                'message' => 'Live2D AI conversation is ready.',
+                'history_count' => count($request->session()->get($sessionKey, [])),
+            ]);
+        }
+
+        $payload = $request->validate([
+            'message' => ['nullable', 'string', 'max:500'],
+            'reset' => ['sometimes', 'boolean'],
+        ]);
+
+        if (($payload['reset'] ?? false) === true) {
+            $request->session()->forget($sessionKey);
+
+            return response()->json([
+                'success' => true,
+                'conversation_mode' => 'live2d_ai_dialogue',
+                'assistant_text' => 'Conversation cleared. I am ready for a new speaking round.',
+                'provider' => 'system',
+                'history_count' => 0,
+            ]);
+        }
+
+        $message = trim((string) ($payload['message'] ?? ''));
+
+        if ($message === '') {
+            return response()->json([
+                'message' => 'Please type something or use the microphone before sending.',
+            ], 422);
+        }
+
+        $history = $request->session()->get($sessionKey, []);
+        $history = is_array($history) ? $history : [];
+        $result = $this->generateLive2dReply(
+            $message,
+            $history,
+            $request->user()?->name
+        );
+
+        $updatedHistory = collect([
+            ...$history,
+            ['role' => 'user', 'content' => $message],
+            ['role' => 'assistant', 'content' => $result['assistant_text']],
+        ])
+            ->filter(fn ($item) => is_array($item) && filled($item['role'] ?? null) && filled($item['content'] ?? null))
+            ->take(-12)
+            ->values()
+            ->all();
+
+        $request->session()->put($sessionKey, $updatedHistory);
+
         return response()->json([
-            'status' => 'pending_integration',
+            'success' => true,
+            'status' => $result['status'] ?? 'available',
             'conversation_mode' => 'live2d_ai_dialogue',
-            'message' => 'Live2D AI conversation is reserved for future integration.',
-            'expected_payload' => [
-                'message' => 'string|null',
-                'audio' => 'uploaded audio blob|null',
-                'conversation_id' => 'string|null',
-            ],
-        ], 501);
+            'user_text' => $message,
+            'assistant_text' => (string) $result['assistant_text'],
+            'provider' => $result['provider'] ?? 'unknown',
+            'history_count' => count($updatedHistory),
+            'notice' => $result['notice'] ?? null,
+        ]);
     }
 
     public function speakingVideoCall(): View
@@ -371,6 +428,168 @@ class ArticleController extends Controller
         ));
 
         return view('articles.writing', $data);
+    }
+
+    protected function generateLive2dReply(string $message, array $history = [], ?string $userName = null): array
+    {
+        $history = $this->normalizeLive2dHistory($history);
+        $apiKey = (string) config('services.gemini.api_key', '');
+        $model = (string) config('services.gemini.model', 'gemini-2.5-flash');
+        $baseUrl = rtrim((string) config('services.gemini.base_url', 'https://generativelanguage.googleapis.com/v1beta/models'), '/');
+
+        if ($apiKey === '') {
+            return $this->buildLive2dFallbackReply($message, true);
+        }
+
+        try {
+            if (! str_contains($baseUrl, 'generativelanguage.googleapis.com')) {
+                $messages = [
+                    [
+                        'role' => 'system',
+                        'content' => $this->live2dSystemPrompt($userName),
+                    ],
+                ];
+
+                foreach ($history as $item) {
+                    $messages[] = [
+                        'role' => $item['role'],
+                        'content' => $item['content'],
+                    ];
+                }
+
+                $messages[] = [
+                    'role' => 'user',
+                    'content' => $message,
+                ];
+
+                $response = Http::timeout(60)
+                    ->withToken($apiKey)
+                    ->withHeaders([
+                        'Content-Type' => 'application/json',
+                    ])
+                    ->post($baseUrl.'/chat/completions', [
+                        'model' => $model,
+                        'messages' => $messages,
+                        'temperature' => 0.7,
+                    ]);
+
+                if ($response->failed()) {
+                    throw new \RuntimeException((string) ($response->json('error.message') ?? 'Failed to reach the conversation model.'));
+                }
+
+                $assistantText = trim((string) ($response->json('choices.0.message.content') ?? ''));
+                if ($assistantText === '') {
+                    throw new \RuntimeException('The conversation model returned an empty reply.');
+                }
+
+                return [
+                    'status' => 'available',
+                    'provider' => 'gemini-compatible',
+                    'assistant_text' => $assistantText,
+                ];
+            }
+
+            $parts = [
+                ['text' => $this->live2dSystemPrompt($userName)],
+            ];
+
+            foreach ($history as $item) {
+                $speaker = $item['role'] === 'assistant' ? 'Hiyori' : 'Learner';
+                $parts[] = ['text' => $speaker.': '.$item['content']];
+            }
+
+            $parts[] = ['text' => 'Learner: '.$message];
+
+            $response = Http::timeout(60)
+                ->withHeaders([
+                    'Content-Type' => 'application/json',
+                ])
+                ->post("{$baseUrl}/{$model}:generateContent?key={$apiKey}", [
+                    'contents' => [
+                        [
+                            'parts' => $parts,
+                        ],
+                    ],
+                    'generationConfig' => [
+                        'temperature' => 0.7,
+                    ],
+                ]);
+
+            if ($response->failed()) {
+                throw new \RuntimeException((string) ($response->json('error.message') ?? 'Failed to reach the conversation model.'));
+            }
+
+            $assistantText = trim((string) ($response->json('candidates.0.content.parts.0.text') ?? ''));
+            if ($assistantText === '') {
+                throw new \RuntimeException('The conversation model returned an empty reply.');
+            }
+
+            return [
+                'status' => 'available',
+                'provider' => 'gemini-native',
+                'assistant_text' => $assistantText,
+            ];
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return $this->buildLive2dFallbackReply($message, false);
+        }
+    }
+
+    protected function normalizeLive2dHistory(array $history): array
+    {
+        return collect($history)
+            ->filter(fn ($item) => is_array($item))
+            ->map(function (array $item) {
+                $role = (string) ($item['role'] ?? 'user');
+
+                return [
+                    'role' => in_array($role, ['user', 'assistant'], true) ? $role : 'user',
+                    'content' => trim((string) ($item['content'] ?? '')),
+                ];
+            })
+            ->filter(fn (array $item) => $item['content'] !== '')
+            ->take(-10)
+            ->values()
+            ->all();
+    }
+
+    protected function live2dSystemPrompt(?string $userName): string
+    {
+        $learnerName = trim((string) $userName) !== '' ? trim((string) $userName) : 'the learner';
+
+        return <<<PROMPT
+You are Hiyori, a warm English-speaking practice companion helping {$learnerName}.
+Reply in natural English.
+Keep most replies within 2 to 4 short sentences.
+When the learner makes a grammar mistake, gently model a cleaner version without sounding like a harsh examiner.
+Prioritize practical speaking, listening, reading, and writing advice.
+Do not use markdown, bullet lists, or emojis.
+PROMPT;
+    }
+
+    protected function buildLive2dFallbackReply(string $message, bool $unconfigured): array
+    {
+        $normalized = Str::lower($message);
+
+        $assistantText = match (true) {
+            Str::contains($normalized, ['hello', 'hi']) => 'Hello. I am ready. Tell me which skill you want to practice, and I will keep the next step simple.',
+            Str::contains($normalized, ['listening', 'listen']) => 'For listening, replay one short part and catch the keywords before trying the whole sentence again.',
+            Str::contains($normalized, ['reading', 'read']) => 'For reading, paraphrase each paragraph in one short sentence before you move on.',
+            Str::contains($normalized, ['writing', 'write']) => 'For writing, get the main idea down first, then revise grammar only after the draft is complete.',
+            Str::contains($normalized, ['speaking', 'speak', 'shadowing']) => 'For speaking, keep the clip short. Match rhythm first, then fix individual words on the next try.',
+            Str::contains($normalized, ['tired', 'busy']) => 'Then choose the smallest useful task. One finished round is better than waiting for perfect energy.',
+            default => 'I heard you. Ask me about listening, reading, writing, or speaking practice, and I will answer in short coaching steps.',
+        };
+
+        return [
+            'status' => $unconfigured ? 'degraded' : 'fallback',
+            'provider' => 'local-fallback',
+            'assistant_text' => $assistantText,
+            'notice' => $unconfigured
+                ? 'Gemini API key is not configured, so the page is using the low-cost local fallback reply mode.'
+                : 'The live model request failed, so the page fell back to the local reply mode.',
+        ];
     }
 
     protected function buildPageData(Article $article): array

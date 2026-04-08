@@ -366,6 +366,7 @@
     let isListening = false;
     let finalTranscript = '';
     let lastVoiceReply = 'I am ready. Ask about studying, gold, the shop, or just say hello.';
+    let preferredVoice = null;
 
     function speak(text, duration = 5200) {
         if (!text) {
@@ -429,6 +430,43 @@
         return 'I heard you. This frontend prototype can already listen and reply locally, but the deeper conversation logic still needs a backend later.';
     }
 
+    function pickPreferredVoice() {
+        if (!('speechSynthesis' in window)) {
+            return null;
+        }
+
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices.length) {
+            return null;
+        }
+
+        const preferredPatterns = [
+            /aria/i,
+            /ava/i,
+            /samantha/i,
+            /allison/i,
+            /zoe/i,
+            /emma/i,
+            /jenny/i,
+            /female/i,
+            /woman/i,
+            /girl/i,
+        ];
+
+        const englishVoices = voices.filter((voice) => /^en(-|_)/i.test(voice.lang || ''));
+        const femaleEnglish = englishVoices.find((voice) =>
+            preferredPatterns.some((pattern) => pattern.test(voice.name || ''))
+        );
+
+        preferredVoice = femaleEnglish
+            || englishVoices.find((voice) => /en-us/i.test(voice.lang || ''))
+            || englishVoices[0]
+            || voices[0]
+            || null;
+
+        return preferredVoice;
+    }
+
     function speakOutLoud(text) {
         if (!('speechSynthesis' in window) || !text) {
             return;
@@ -437,8 +475,15 @@
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
-        utterance.rate = 0.98;
-        utterance.pitch = 1.08;
+        utterance.rate = 1.0;
+        utterance.pitch = 1.22;
+
+        const voice = preferredVoice || pickPreferredVoice();
+        if (voice) {
+            utterance.voice = voice;
+            utterance.lang = voice.lang || utterance.lang;
+        }
+
         window.speechSynthesis.speak(utterance);
     }
 
@@ -694,10 +739,15 @@
     });
 
     activateTab('outfit');
+    pickPreferredVoice();
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => {
+            pickPreferredVoice();
+        };
+    }
     setupVoiceRecognition();
     loadScene();
 })();
 </script>
 @endpush
-
 

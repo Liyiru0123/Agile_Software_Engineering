@@ -13,7 +13,7 @@
 
             <h1 class="text-3xl font-bold text-[#4A2C2A] mb-3">Speaking</h1>
             <p class="text-[#6B3D2E] leading-7 max-w-3xl">
-                Choose the speaking mode you want to use. You can continue with article-based speaking practice, or open the reserved AI conversation page for the future Live2D integration.
+                Choose the speaking mode you want to use. You can continue with article-based speaking practice, talk with the Live2D AI companion, or enter the video call room.
             </p>
         </div>
 
