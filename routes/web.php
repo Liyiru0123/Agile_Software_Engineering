@@ -21,6 +21,7 @@ use App\Models\FriendRequest;
 use App\Models\ForumPost;
 use App\Models\ReadingHistory;
 use App\Models\SelectionFavorite;
+use App\Models\Submission;
 use App\Models\UserPlan;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -394,6 +395,7 @@ Route::get('/articles', function (Request $request) {
 
     if ($request->filled('favorites') && $request->favorites === '1') {
         $query->join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
+            ->select('articles.*')
             ->where('user_favorites.user_id', auth()->id());
     }
 
