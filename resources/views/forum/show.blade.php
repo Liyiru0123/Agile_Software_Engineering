@@ -114,6 +114,11 @@
                         </form>
                     @else
                         <h1 class="text-4xl font-black tracking-tight text-[#4A2C2A]">{{ $post->title }}</h1>
+                        @if($post->source_name)
+                            <div class="mt-3 inline-flex items-center rounded-full bg-[#FBF7F1] px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#8B6B47]">
+                                Source: {{ $post->source_name }}
+                            </div>
+                        @endif
                         @php
                             $postAuthorAvatar = mb_strtoupper(trim(mb_substr($post->user?->name ?? 'U', 0, 2)));
                             $postSocialState = $socialTargetStates[$post->user_id] ?? ['is_friend' => false, 'pending_sent' => false, 'pending_received' => false];
@@ -196,7 +201,7 @@
             </div>
 
             @unless($editingPost && auth()->id() === $post->user_id)
-                <div class="forum-content-wrap forum-social-target mt-6 whitespace-pre-line rounded-[1.5rem] bg-[#FBF7F1] px-6 py-5 leading-8 text-[#3A2A22]"
+                <div class="forum-content-wrap forum-social-target mt-6 rounded-[1.5rem] bg-[#FBF7F1] px-6 py-5 text-[#3A2A22]"
                      data-user-id="{{ $post->user_id }}"
                      data-user-name="{{ $post->user?->name ?? 'Unknown' }}"
                      data-source-type="forum_post"
@@ -204,9 +209,8 @@
                      data-is-friend="{{ $postSocialState['is_friend'] ? '1' : '0' }}"
                      data-pending-sent="{{ $postSocialState['pending_sent'] ? '1' : '0' }}"
                      data-pending-received="{{ $postSocialState['pending_received'] ? '1' : '0' }}">
-                    {{ $post->body }}
+                    @include('forum.partials.rich-body', ['item' => $post, 'body' => $post->body])
                 </div>
-                @include('forum.partials.attachment', ['item' => $post])
             @endunless
         </article>
 
@@ -371,15 +375,16 @@
                                     </div>
                                 </form>
                             @else
-                                <div class="forum-content-wrap forum-social-target mt-3 whitespace-pre-line leading-7 text-[#3A2A22]"
+                                <div class="forum-content-wrap forum-social-target mt-3 text-[#3A2A22]"
                                      data-user-id="{{ $comment->user_id }}"
                                      data-user-name="{{ $comment->user?->name ?? 'Unknown' }}"
                                      data-source-type="forum_comment"
                                      data-source-id="{{ $comment->id }}"
                                      data-is-friend="{{ $commentSocialState['is_friend'] ? '1' : '0' }}"
                                      data-pending-sent="{{ $commentSocialState['pending_sent'] ? '1' : '0' }}"
-                                     data-pending-received="{{ $commentSocialState['pending_received'] ? '1' : '0' }}">{{ $comment->body }}</div>
-                                @include('forum.partials.attachment', ['item' => $comment])
+                                     data-pending-received="{{ $commentSocialState['pending_received'] ? '1' : '0' }}">
+                                    @include('forum.partials.rich-body', ['item' => $comment, 'body' => $comment->body])
+                                </div>
                             @endif
                         </div>
 

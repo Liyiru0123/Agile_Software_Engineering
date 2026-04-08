@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             VocabularySeeder::class,
             WordleWordSeeder::class,
             AdminUserSeeder::class,
+            ForumPostSeeder::class,
         ]);
 
         $this->command?->info('All seed data imported successfully.');

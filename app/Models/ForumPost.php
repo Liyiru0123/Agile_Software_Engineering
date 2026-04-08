@@ -17,6 +17,7 @@ class ForumPost extends Model
         'user_id',
         'forum_tag_id',
         'title',
+        'source_name',
         'body',
         'attachment_path',
         'attachment_original_name',

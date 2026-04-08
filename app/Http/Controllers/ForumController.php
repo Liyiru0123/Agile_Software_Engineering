@@ -678,6 +678,8 @@ class ForumController extends Controller
 
     protected function excerptWithHighlight(string $text, string $search, int $limit = 220): string
     {
+        $text = $this->normalizeForumDisplayText($text);
+
         if ($search === '') {
             return e(Str::limit($text, $limit));
         }
@@ -704,6 +706,8 @@ class ForumController extends Controller
 
     protected function highlightText(string $text, string $search): string
     {
+        $text = $this->normalizeForumDisplayText($text);
+
         if ($search === '') {
             return e($text);
         }
@@ -723,6 +727,15 @@ class ForumController extends Controller
                 return e($segment);
             })
             ->implode('');
+    }
+
+    protected function normalizeForumDisplayText(string $text): string
+    {
+        $text = preg_replace('/\[\[forum-image:\d+\]\]/', '', $text) ?? $text;
+        $text = preg_replace('/^##\s+/m', '', $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+
+        return trim($text);
     }
 
     protected function attachReactionStateToPosts($posts, $user): void

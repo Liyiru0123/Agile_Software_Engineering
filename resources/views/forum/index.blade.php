@@ -236,6 +236,11 @@
                                     <a href="{{ route('forum.posts.show', $post) }}" class="block">
                                         <h3 class="forum-title-clamp text-2xl font-black text-[#4A2C2A] transition hover:text-[#6B3D2E]">{!! $post->highlighted_title !!}</h3>
                                     </a>
+                                    @if($post->source_name)
+                                        <div class="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#8B6B47]">
+                                            Source: {{ $post->source_name }}
+                                        </div>
+                                    @endif
                                     <p class="forum-preview-clamp mt-3 leading-7 text-[#6B3D2E]">{!! $post->highlighted_excerpt !!}</p>
                                     <div class="mt-4 flex flex-wrap items-center gap-3">
                                         @if($post->can_pin ?? false)
