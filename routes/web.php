@@ -567,9 +567,12 @@ Route::get('/notebook/review', [NotebookController::class, 'review'])->name('not
 Route::get('/favorites', [FavoritesController::class, 'index'])->name('favorites.index')->middleware('auth');
 Route::get('/favorites/plan', [FavoritesController::class, 'plan'])->name('favorites.plan')->middleware('auth');
 Route::post('/favorites/plan', [FavoritesController::class, 'storePlan'])->name('favorites.plan.store')->middleware('auth');
-Route::get('/companion', [CompanionController::class, 'index'])->name('companion.index')->middleware('auth');
-Route::post('/companion/shop/{item}/purchase', [CompanionController::class, 'purchase'])->name('companion.purchase')->middleware('auth');
-Route::post('/companion/shop/{item}/equip', [CompanionController::class, 'equip'])->name('companion.equip')->middleware('auth');
+Route::get('/shop', [CompanionController::class, 'index'])->name('shop.index')->middleware('auth');
+Route::post('/shop/items/{item}/purchase', [CompanionController::class, 'purchase'])->name('shop.purchase')->middleware('auth');
+Route::post('/shop/items/{item}/equip', [CompanionController::class, 'equip'])->name('shop.equip')->middleware('auth');
+Route::post('/shop/check-in', [CompanionController::class, 'checkIn'])->name('shop.check-in')->middleware('auth');
+Route::post('/shop/check-in/makeup', [CompanionController::class, 'useMakeupCard'])->name('shop.check-in.makeup')->middleware('auth');
+Route::get('/companion', fn () => redirect()->route('shop.index'))->name('companion.index')->middleware('auth');
 
 Route::get('/login', function () {
     return view('auth.login');

@@ -34,6 +34,11 @@ class User extends Authenticatable
         return $this->hasMany(CompanionTransaction::class);
     }
 
+    public function dailyAttendances(): HasMany
+    {
+        return $this->hasMany(DailyAttendance::class);
+    }
+
     public function forumTags(): HasMany
     {
         return $this->hasMany(ForumTag::class);

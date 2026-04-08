@@ -20,6 +20,23 @@
 
     $prevMonth = $currentMonthValue->copy()->subMonthNoOverflow();
     $nextMonth = $currentMonthValue->copy()->addMonthNoOverflow();
+    $summaryIcon = function (string $key): string {
+        return match ($key) {
+            'week' => '<svg class="h-9 w-9" viewBox="0 0 48 48" fill="none"><rect x="9" y="11" width="30" height="26" rx="8" fill="#FFF8F0" stroke="#6B3D2E" stroke-width="3"/><path d="M16 9V16" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round"/><path d="M32 9V16" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round"/><path d="M16 23H24" stroke="#D88C5A" stroke-width="3" stroke-linecap="round"/><path d="M16 29H31" stroke="#C9A961" stroke-width="3" stroke-linecap="round"/></svg>',
+            'month' => '<svg class="h-9 w-9" viewBox="0 0 48 48" fill="none"><rect x="8" y="10" width="32" height="28" rx="8" fill="#FFFDF8" stroke="#8B6B47" stroke-width="3"/><path d="M16 18H32" stroke="#8B6B47" stroke-width="3" stroke-linecap="round"/><path d="M16 25H26" stroke="#D88C5A" stroke-width="3" stroke-linecap="round"/><circle cx="31" cy="28" r="5" fill="#FFF3CF" stroke="#C9A961" stroke-width="2.5"/></svg>',
+            'today' => '<svg class="h-9 w-9" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="14" fill="#FFF3CF" stroke="#C9A961" stroke-width="3"/><path d="M24 17V24L29 28" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+            default => '<svg class="h-9 w-9" viewBox="0 0 48 48" fill="none"><path d="M24 10L38 34H10L24 10Z" fill="#FBE4DB" stroke="#C95F43" stroke-width="3" stroke-linejoin="round"/><path d="M24 19V25" stroke="#C95F43" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="31" r="2" fill="#C95F43"/></svg>',
+        };
+    };
+    $toolIcon = function (string $key): string {
+        return match ($key) {
+            'favorites' => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><path d="M24 38L11 25C7.5 21.5 7.5 15.8 11 12.4C14.4 9 20 9 23.4 12.4L24 13L24.6 12.4C28 9 33.6 9 37 12.4C40.5 15.8 40.5 21.5 37 25L24 38Z" fill="#FBE4DB" stroke="#C95F43" stroke-width="3" stroke-linejoin="round"/></svg>',
+            'history' => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="14" fill="#FFF3CF" stroke="#C9A961" stroke-width="3"/><path d="M24 17V24L29 27" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 24H8" stroke="#8B6B47" stroke-width="3" stroke-linecap="round"/></svg>',
+            'notebook' => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><rect x="11" y="8" width="26" height="32" rx="7" fill="#FFF8F0" stroke="#6B3D2E" stroke-width="3"/><path d="M18 17H30" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round"/><path d="M18 23H30" stroke="#D88C5A" stroke-width="3" stroke-linecap="round"/><path d="M18 29H25" stroke="#C9A961" stroke-width="3" stroke-linecap="round"/></svg>',
+            'analysis' => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><path d="M12 35V18" stroke="#6B3D2E" stroke-width="4" stroke-linecap="round"/><path d="M24 35V12" stroke="#D88C5A" stroke-width="4" stroke-linecap="round"/><path d="M36 35V22" stroke="#C9A961" stroke-width="4" stroke-linecap="round"/><path d="M10 35H38" stroke="#8B6B47" stroke-width="3" stroke-linecap="round"/></svg>',
+            default => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><rect x="10" y="10" width="28" height="28" rx="10" fill="#FFFDF8" stroke="#8B6B47" stroke-width="3"/><path d="M16 24H32" stroke="#8B6B47" stroke-width="3" stroke-linecap="round"/><path d="M24 16V32" stroke="#D88C5A" stroke-width="3" stroke-linecap="round"/></svg>',
+        };
+    };
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -30,7 +47,7 @@
     @endif
 
     <section class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 sm:p-8 shadow-sm">
-        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
             <div class="max-w-3xl">
                 <div class="inline-flex items-center rounded-full bg-[#F3E7D8] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8B6B47]">
                     Dashboard
@@ -41,44 +58,86 @@
                 <p class="mt-3 text-sm sm:text-base leading-7 text-[#8B6B47]">
                     This page now focuses on execution first: weekly and monthly completion, the selected day's tasks, and a quick way to create new plans.
                 </p>
+                <div class="mt-5 flex flex-wrap gap-3 text-sm text-[#8B6B47]">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FBE4DB]">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M5 12H19" stroke="#C95F43" stroke-width="2.2" stroke-linecap="round"/><path d="M12 5V19" stroke="#C95F43" stroke-width="2.2" stroke-linecap="round"/></svg>
+                        </span>
+                        Quick planning
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3CF]">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M4 8H20" stroke="#C9A961" stroke-width="2.2" stroke-linecap="round"/><path d="M7 12H17" stroke="#C9A961" stroke-width="2.2" stroke-linecap="round"/><path d="M10 16H14" stroke="#C9A961" stroke-width="2.2" stroke-linecap="round"/></svg>
+                        </span>
+                        Calendar-led view
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2">
+                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#E8D6C7]">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M6 12L10 16L18 8" stroke="#6B3D2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        One clear next step
+                    </span>
+                </div>
+
+                <div class="mt-6 flex flex-wrap gap-3">
+                    <a href="{{ route('favorites.plan') }}"
+                       class="inline-flex items-center justify-center rounded-xl bg-[#4A2C2A] px-4 py-3 text-sm font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
+                        Plan From Favorites
+                    </a>
+                    <a href="{{ route('study.analysis') }}"
+                       class="inline-flex items-center justify-center rounded-xl border border-[#C9A961] px-4 py-3 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
+                        View Analysis
+                    </a>
+                    <a href="{{ route('articles.index') }}"
+                       class="inline-flex items-center justify-center rounded-xl border border-[#C9A961] px-4 py-3 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
+                        Browse Articles
+                    </a>
+                </div>
             </div>
 
-            <div class="flex flex-wrap gap-3">
-                <a href="{{ route('favorites.plan') }}"
-                   class="inline-flex items-center justify-center rounded-xl bg-[#4A2C2A] px-4 py-3 text-sm font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
-                    Plan From Favorites
-                </a>
-                <a href="{{ route('study.analysis') }}"
-                   class="inline-flex items-center justify-center rounded-xl border border-[#C9A961] px-4 py-3 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
-                    View Analysis
-                </a>
-                <a href="{{ route('articles.index') }}"
-                   class="inline-flex items-center justify-center rounded-xl border border-[#C9A961] px-4 py-3 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
-                    Browse Articles
-                </a>
+            <div class="rounded-[2rem] border border-[#E8D9C7] bg-[linear-gradient(180deg,#FFF8F0_0%,#F3E4D8_100%)] p-5">
+                <svg class="w-full" viewBox="0 0 280 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="28" y="34" width="224" height="136" rx="24" fill="#FFFDF8" stroke="#D8C3A6" stroke-width="3"/>
+                    <rect x="48" y="56" width="72" height="84" rx="16" fill="#FBE4DB"/>
+                    <path d="M64 80H102" stroke="#C95F43" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M64 98H96" stroke="#D88C5A" stroke-width="6" stroke-linecap="round"/>
+                    <rect x="138" y="54" width="92" height="18" rx="9" fill="#FFF3CF"/>
+                    <rect x="138" y="84" width="70" height="14" rx="7" fill="#E8D6C7"/>
+                    <rect x="138" y="108" width="54" height="14" rx="7" fill="#F3E7D8"/>
+                    <circle cx="214" cy="118" r="20" fill="#FFF3CF" stroke="#C9A961" stroke-width="3"/>
+                    <path d="M214 107V118L222 123" stroke="#6B3D2E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <rect x="84" y="170" width="112" height="16" rx="8" fill="#4A2C2A"/>
+                </svg>
+                <div class="mt-3 text-sm leading-6 text-[#6B3D2E]">
+                    The main actions are now paired with a simple scene so the page reads faster before users scan the text.
+                </div>
             </div>
         </div>
 
         <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
+                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('week') !!}</div>
                 <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">This Week</div>
                 <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $weeklySummary['completion_rate'] }}%</div>
                 <div class="mt-1 text-sm text-[#8B6B47]">{{ $weeklySummary['completed'] }} of {{ $weeklySummary['total'] }} tasks completed</div>
             </article>
 
             <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
+                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('month') !!}</div>
                 <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">This Month</div>
                 <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $monthlySummary['completion_rate'] }}%</div>
                 <div class="mt-1 text-sm text-[#8B6B47]">{{ $monthlySummary['completed'] }} of {{ $monthlySummary['total'] }} tasks completed</div>
             </article>
 
             <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
+                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('today') !!}</div>
                 <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Today</div>
                 <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $todaySummary['pending'] }}</div>
                 <div class="mt-1 text-sm text-[#8B6B47]">{{ $todaySummary['completed'] }} done, {{ $todaySummary['skipped'] }} skipped</div>
             </article>
 
             <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
+                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('overdue') !!}</div>
                 <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Overdue</div>
                 <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $overdueTasks->count() }}</div>
                 <div class="mt-1 text-sm text-[#8B6B47]">Pending tasks from earlier dates</div>
@@ -458,17 +517,33 @@
     </section>
 
     <section class="space-y-4">
-        <div>
-            <h2 class="text-2xl font-black text-[#4A2C2A]">Support Tools</h2>
-            <p class="mt-1 text-sm text-[#8B6B47]">Useful resources stay available, but they no longer compete with your daily plan.</p>
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-end">
+            <div>
+                <h2 class="text-2xl font-black text-[#4A2C2A]">Support Tools</h2>
+                <p class="mt-1 text-sm text-[#8B6B47]">Useful resources stay available, but they no longer compete with your daily plan.</p>
+            </div>
+            <div class="rounded-[1.75rem] border border-[#E6D3BC] bg-[linear-gradient(180deg,#FFF8F0_0%,#F3E4D8_100%)] p-4">
+                <svg class="w-full" viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="16" y="66" width="46" height="28" rx="14" fill="#FBE4DB"/>
+                    <rect x="74" y="50" width="46" height="44" rx="16" fill="#FFF3CF"/>
+                    <rect x="132" y="34" width="46" height="60" rx="16" fill="#E8D6C7"/>
+                    <rect x="190" y="18" width="14" height="76" rx="7" fill="#6B3D2E"/>
+                    <path d="M12 98H208" stroke="#4A2C2A" stroke-width="6" stroke-linecap="round"/>
+                </svg>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
             <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
-                    <h3 class="text-lg font-black text-[#4A2C2A]">Favorites</h3>
+                    <div class="flex items-center gap-3">
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('favorites') !!}</div>
+                        <h3 class="text-lg font-black text-[#4A2C2A]">Favorites</h3>
+                    </div>
                     <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $favoritesSummary['total'] }}</span>
                 </div>
+
+                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Keep your best articles together, then turn them into study plans without searching again.</p>
 
                 <div class="mt-4 space-y-2">
                     @forelse($favoritesSummary['recent'] as $article)
@@ -496,9 +571,14 @@
 
             <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
-                    <h3 class="text-lg font-black text-[#4A2C2A]">Reading History</h3>
+                    <div class="flex items-center gap-3">
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('history') !!}</div>
+                        <h3 class="text-lg font-black text-[#4A2C2A]">Reading History</h3>
+                    </div>
                     <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $historySummary['active_days_7d'] }} active days</span>
                 </div>
+
+                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Resume from the last article you touched instead of guessing where to restart.</p>
 
                 <div class="mt-4 space-y-2">
                     @forelse($historySummary['recent'] as $item)
@@ -527,9 +607,14 @@
 
             <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
-                    <h3 class="text-lg font-black text-[#4A2C2A]">Notebook</h3>
+                    <div class="flex items-center gap-3">
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('notebook') !!}</div>
+                        <h3 class="text-lg font-black text-[#4A2C2A]">Notebook</h3>
+                    </div>
                     <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $notebookSummary['review_pending'] }} saved</span>
                 </div>
+
+                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Capture useful phrases and example sentences, then come back when it is review time.</p>
 
                 <div class="mt-4 space-y-2">
                     @forelse($notebookSummary['recent'] as $item)
@@ -558,7 +643,10 @@
 
             <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
-                    <h3 class="text-lg font-black text-[#4A2C2A]">Analysis</h3>
+                    <div class="flex items-center gap-3">
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('analysis') !!}</div>
+                        <h3 class="text-lg font-black text-[#4A2C2A]">Analysis</h3>
+                    </div>
                     <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">Insights</span>
                 </div>
 
@@ -576,9 +664,14 @@
 
             <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
-                    <h3 class="text-lg font-black text-[#4A2C2A]">Community</h3>
+                    <div class="flex items-center gap-3">
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('community') !!}</div>
+                        <h3 class="text-lg font-black text-[#4A2C2A]">Community</h3>
+                    </div>
                     <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $communitySummary['my_posts_count'] }} posts</span>
                 </div>
+
+                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Track your posts and saved discussions without digging through the forum first.</p>
 
                 <div class="mt-4 space-y-2 text-sm text-[#6B3D2E]">
                     <div class="rounded-xl bg-white/80 px-3 py-3">My posts: {{ $communitySummary['my_posts_count'] }}</div>

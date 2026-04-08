@@ -14,9 +14,11 @@ class CompanionShopItem extends Model
         'slug',
         'name',
         'type',
+        'stackable',
         'description',
         'price',
         'rarity',
+        'benefit_key',
         'visual',
         'is_active',
     ];
@@ -26,6 +28,7 @@ class CompanionShopItem extends Model
         return [
             'visual' => 'array',
             'is_active' => 'bool',
+            'stackable' => 'bool',
         ];
     }
 

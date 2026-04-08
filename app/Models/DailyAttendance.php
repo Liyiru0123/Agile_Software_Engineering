@@ -6,33 +6,32 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CompanionInventory extends Model
+class DailyAttendance extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'user_id',
+        'attendance_date',
+        'source',
+        'reward_amount',
         'shop_item_id',
-        'quantity',
-        'purchased_at',
-        'last_used_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'purchased_at' => 'datetime',
-            'last_used_at' => 'datetime',
+            'attendance_date' => 'date',
         ];
-    }
-
-    public function item(): BelongsTo
-    {
-        return $this->belongsTo(CompanionShopItem::class, 'shop_item_id');
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function shopItem(): BelongsTo
+    {
+        return $this->belongsTo(CompanionShopItem::class, 'shop_item_id');
     }
 }

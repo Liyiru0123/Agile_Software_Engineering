@@ -131,9 +131,9 @@
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('forum.*') ? 'bg-[#6B3D2E]' : '' }}">
                         Forum
                     </a>
-                    <a href="{{ route('companion.index') }}"
-                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('companion.*') ? 'bg-[#6B3D2E]' : '' }}">
-                        Companion
+                    <a href="{{ route('shop.index') }}"
+                       class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ (request()->routeIs('shop.*') || request()->routeIs('companion.*')) ? 'bg-[#6B3D2E]' : '' }}">
+                        Shop
                     </a>
                     <a href="{{ route('game.index') }}"
                        class="px-4 py-2 text-[#F5E6D3] hover:bg-[#6B3D2E] rounded-lg transition text-sm font-medium {{ request()->routeIs('game.*') ? 'bg-[#6B3D2E]' : '' }}">
@@ -148,7 +148,7 @@
                     $avatarText = mb_strtoupper(trim(mb_substr($userName, 0, 2)));
                 @endphp
                 <div class="flex items-center gap-4">
-                    <a href="{{ route('companion.index') }}" class="hidden sm:inline-flex items-center gap-2 rounded-full border border-[#C9A961]/50 bg-[#F5E6D3]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#F5E6D3] hover:bg-[#F5E6D3]/15 transition">
+                    <a href="{{ route('shop.index') }}" class="hidden sm:inline-flex items-center gap-2 rounded-full border border-[#C9A961]/50 bg-[#F5E6D3]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#F5E6D3] hover:bg-[#F5E6D3]/15 transition">
                         <span>Gold</span>
                         <span class="text-[#D4B970]">{{ number_format($companionGold) }}</span>
                     </a>
