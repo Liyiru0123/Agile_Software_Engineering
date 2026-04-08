@@ -93,4 +93,55 @@ class DashboardPageTest extends TestCase
             'status' => 'pending',
         ]);
     }
+
+    public function test_dashboard_plan_status_can_be_updated_via_json_request(): void
+    {
+        $user = User::factory()->create();
+        $plan = UserPlan::query()->create([
+            'user_id' => $user->id,
+            'article_id' => null,
+            'plan_date' => now()->toDateString(),
+            'plan_kind' => 'custom',
+            'title' => 'Review vocabulary notebook',
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($user)
+            ->patchJson(route('plans.update', $plan), [
+                'status' => 'completed',
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('plan.status', 'completed');
+
+        $this->assertDatabaseHas('user_plans', [
+            'id' => $plan->id,
+            'status' => 'completed',
+        ]);
+
+        $this->assertNotNull($plan->fresh()->completed_at);
+    }
+
+    public function test_dashboard_plan_delete_rejects_non_owner(): void
+    {
+        $owner = User::factory()->create();
+        $intruder = User::factory()->create();
+        $plan = UserPlan::query()->create([
+            'user_id' => $owner->id,
+            'article_id' => null,
+            'plan_date' => now()->toDateString(),
+            'plan_kind' => 'custom',
+            'title' => 'Private study task',
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($intruder)
+            ->deleteJson(route('plans.destroy', $plan))
+            ->assertForbidden()
+            ->assertJsonPath('error', 'Unauthorized');
+
+        $this->assertDatabaseHas('user_plans', [
+            'id' => $plan->id,
+        ]);
+    }
 }

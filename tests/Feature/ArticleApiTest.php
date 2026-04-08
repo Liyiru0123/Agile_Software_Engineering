@@ -86,4 +86,68 @@ class ArticleApiTest extends TestCase
             ->assertJsonPath('data.paragraphs.0.text', 'Concrete is strong. Asphalt is flexible.')
             ->assertJsonPath('data.paragraphs.1.sentences.0.text', 'Both materials need maintenance.');
     }
+
+    public function test_it_returns_validation_error_for_invalid_subject(): void
+    {
+        $response = $this->postJson('/api/articles', [
+            'subject' => 'Chemistry',
+            'title' => 'Unsupported Subject',
+            'level' => 'Easy',
+            'content' => 'A short article body.',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['subject']);
+    }
+
+    public function test_it_updates_article_content_and_rebuilds_segments(): void
+    {
+        Storage::fake('public');
+
+        $article = Article::query()->create([
+            'subject' => 'Computer Science',
+            'title' => 'Original Title',
+            'slug' => 'original-title',
+            'author' => 'Seeder',
+            'source' => 'Internal',
+            'level' => 'Easy',
+            'resource_type' => 'text',
+            'accent' => 'US',
+            'word_count' => 4,
+            'total_duration' => 0,
+        ]);
+
+        $article->segments()->createMany([
+            [
+                'paragraph_index' => 0,
+                'sentence_index' => 0,
+                'content_en' => 'Old sentence.',
+            ],
+        ]);
+
+        $response = $this->putJson('/api/articles/'.$article->id, [
+            'title' => 'Updated Title',
+            'content' => "New opening sentence. Another detail follows.",
+            'accent' => 'UK',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.article.title', 'Updated Title')
+            ->assertJsonPath('data.article.slug', 'updated-title')
+            ->assertJsonPath('data.article.accent', 'UK')
+            ->assertJsonPath('data.reading.paragraphs.0.sentences.1.text', 'Another detail follows.');
+
+        $this->assertDatabaseHas('articles', [
+            'id' => $article->id,
+            'title' => 'Updated Title',
+            'slug' => 'updated-title',
+            'accent' => 'UK',
+        ]);
+
+        $this->assertDatabaseCount('article_segments', 2);
+        $this->assertDatabaseMissing('article_segments', [
+            'article_id' => $article->id,
+            'content_en' => 'Old sentence.',
+        ]);
+    }
 }

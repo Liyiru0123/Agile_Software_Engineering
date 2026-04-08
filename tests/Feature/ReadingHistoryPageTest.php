@@ -93,6 +93,15 @@ class ReadingHistoryPageTest extends TestCase
             ->assertRedirect(route('articles.speaking', $article));
     }
 
+    public function test_continue_route_falls_back_to_article_index_when_history_is_empty(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('history.continue'))
+            ->assertRedirect(route('articles.index'));
+    }
+
     public function test_dashboard_alias_redirects_to_home(): void
     {
         $user = User::factory()->create();
