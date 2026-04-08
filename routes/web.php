@@ -570,4 +570,3 @@ Route::get('/register', function () {
 })->name('register')->middleware('guest');
 
 Route::post('/register', [RegisterController::class, 'register'])->name('register.post');
-

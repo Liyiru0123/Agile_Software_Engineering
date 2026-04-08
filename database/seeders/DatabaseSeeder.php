@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AiPromptSeeder::class,
             ArticleSeeder::class,
+            ArticleSegmentSeeder::class,
             ReadingExerciseMetadataSeeder::class,
             WritingExerciseMetadataSeeder::class,
             SpeakingExerciseSeeder::class,

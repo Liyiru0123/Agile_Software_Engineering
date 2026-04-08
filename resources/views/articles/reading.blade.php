@@ -67,17 +67,29 @@
                          data-target-language="zh-CN">
                         <div class="space-y-6 text-[#3A2A22] leading-8 text-[17px] relative z-[1]">
                             @foreach($articleSentenceMap as $paragraph)
-                                <p class="leading-9"
-                                   data-article-id="{{ $article->id }}"
-                                   data-paragraph-index="{{ $loop->index }}">
-                                    @foreach($paragraph['sentences'] as $sentence)
-                                        <span id="sentence-{{ $sentence['anchor'] }}"
-                                              data-anchor="{{ $sentence['anchor'] }}"
-                                              class="article-sentence">
-                                            {{ $sentence['text'] }}
+                                <section class="rounded-3xl border border-[#EEE2D4] bg-[#FCF8F2] px-4 py-4">
+                                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                                        <span class="inline-flex items-center rounded-full bg-[#4A2C2A] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                                            {{ $paragraph['label'] }}
                                         </span>
-                                    @endforeach
-                                </p>
+                                        @if(!empty($paragraph['time_range_label']))
+                                            <span class="inline-flex items-center rounded-full bg-[#F3E7D8] px-3 py-1 text-[11px] font-semibold text-[#6B3D2E]">
+                                                {{ $paragraph['time_range_label'] }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <p class="leading-9"
+                                       data-article-id="{{ $article->id }}"
+                                       data-paragraph-index="{{ $loop->index }}">
+                                        @foreach($paragraph['sentences'] as $sentence)
+                                            <span id="sentence-{{ $sentence['anchor'] }}"
+                                                  data-anchor="{{ $sentence['anchor'] }}"
+                                                  class="article-sentence">
+                                                {{ $sentence['text'] }}
+                                            </span>
+                                        @endforeach
+                                    </p>
+                                </section>
                             @endforeach
                         </div>
 
