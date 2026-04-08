@@ -2,6 +2,34 @@
 
 @section('title', 'Learning - EAPlus')
 
+@push('styles')
+<style>
+    .articles-chip-row > span > span:first-child {
+        color: transparent;
+        font-size: 0;
+        position: relative;
+    }
+
+    .articles-chip-row > span > span:first-child::after {
+        content: '';
+        display: block;
+        width: 1rem;
+        height: 1rem;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+    }
+
+    .articles-chip-row > span:nth-child(1) > span:first-child::after {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 8H20' stroke='%23C95F43' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M7 12H17' stroke='%23C95F43' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M10 16H14' stroke='%23C95F43' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+
+    .articles-chip-row > span:nth-child(2) > span:first-child::after {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='7' stroke='%23C9A961' stroke-width='2.2'/%3E%3Cpath d='M12 9V12L14 14' stroke='%23C9A961' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="max-w-[1440px] mx-auto px-5 md:px-8 xl:px-12">
     @php
@@ -11,11 +39,41 @@
         $pageSubheading = $currentSkill === 'speaking'
             ? 'Browse speaking-ready articles and practice prompts'
             : 'Browse listening-ready articles and transcript tasks';
+        $heroImage = 'https://images.pexels.com/photos/20449662/pexels-photo-20449662.jpeg?auto=compress&cs=tinysrgb&w=1200';
+        $articleCoverImages = [
+            'https://images.pexels.com/photos/6549849/pexels-photo-6549849.jpeg?auto=compress&cs=tinysrgb&w=1200',
+            'https://images.pexels.com/photos/6549858/pexels-photo-6549858.jpeg?auto=compress&cs=tinysrgb&w=1200',
+            'https://images.pexels.com/photos/6550111/pexels-photo-6550111.jpeg?auto=compress&cs=tinysrgb&w=1200',
+            'https://images.pexels.com/photos/15361509/pexels-photo-15361509.jpeg?auto=compress&cs=tinysrgb&w=1200',
+            'https://images.pexels.com/photos/20449662/pexels-photo-20449662.jpeg?auto=compress&cs=tinysrgb&w=1200',
+            'https://images.pexels.com/photos/6549849/pexels-photo-6549849.jpeg?auto=compress&cs=tinysrgb&w=1200',
+        ];
     @endphp
 
-    <div class="mb-8">
-        <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">{{ $pageHeading }}</h1>
-        <p class="text-[#6B3D2E] mt-1">{{ $pageSubheading }}</p>
+    <div class="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div class="rounded-[2rem] border border-[#D8C3A6] bg-[#FFF8F0] p-6 shadow-sm">
+            <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">{{ $pageHeading }}</h1>
+            <p class="text-[#6B3D2E] mt-2">{{ $pageSubheading }}</p>
+            <div class="articles-chip-row mt-5 flex flex-wrap gap-3 text-sm text-[#8B6B47]">
+                <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FBE4DB]">●</span>Filter by progress</span>
+                <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3CF]">◌</span>Preview each article</span>
+            </div>
+        </div>
+
+        <div class="overflow-hidden rounded-[2rem] border border-[#D8C3A6] bg-[#FFF8F0] shadow-sm">
+            <img
+                src="{{ $heroImage }}"
+                alt="Quiet library reading room"
+                class="h-52 w-full object-cover"
+                loading="eager"
+                referrerpolicy="no-referrer"
+            >
+            <div class="mt-3 text-sm leading-6 text-[#6B3D2E]">
+                <div class="px-5 pb-5 pt-4">
+                    Use the filters first, then open the card that matches your level and current study goal.
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="space-y-6">
@@ -95,7 +153,19 @@
         @if($articles->count() > 0)
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($articles as $article)
+                @php
+                    $coverImage = $articleCoverImages[$loop->index % count($articleCoverImages)];
+                @endphp
                 <article class="bg-white border-2 border-[#6B3D2E] rounded-lg p-6 shadow-md hover:shadow-xl transition-all duration-200 hover:-translate-y-1 group flex flex-col h-full">
+                    <div class="mb-4 overflow-hidden rounded-2xl">
+                        <img
+                            src="{{ $coverImage }}"
+                            alt="Library study scene"
+                            class="h-40 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                            loading="lazy"
+                            referrerpolicy="no-referrer"
+                        >
+                    </div>
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-2">
                             <span class="px-3 py-1 bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs rounded-full font-bold border border-[#6B3D2E]/30 whitespace-nowrap">
