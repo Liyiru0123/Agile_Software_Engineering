@@ -100,7 +100,7 @@
         }
     }
 @endphp
-<body class="bg-[#FAF0E6]">
+<body class="bg-[#FAF0E6]" data-video-presence="@yield('video_presence', '0')">
     <nav class="bg-[#4A2C2A] border-b-4 border-[#2C1810] shadow-xl sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div class="flex items-center gap-6">
@@ -288,6 +288,37 @@
                 accountMenu.removeAttribute('open');
             }
         });
+    })();
+    </script>
+    @endauth
+    @auth
+    <script>
+    (() => {
+        const heartbeatUrl = @json(route('speaking.video-call.heartbeat'));
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const videoReady = document.body?.dataset?.videoPresence === '1';
+
+        async function sendPresence() {
+            try {
+                await fetch(heartbeatUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({
+                        path: window.location.pathname,
+                        video_ready: videoReady,
+                    }),
+                });
+            } catch (error) {
+                return;
+            }
+        }
+
+        sendPresence();
+        window.setInterval(sendPresence, 45000);
     })();
     </script>
     @endauth

@@ -61,6 +61,13 @@ return [
         'quality' => env('LANGBLY_QUALITY', 'standard'),
     ],
 
+    'livekit' => [
+        'url' => env('LIVEKIT_URL'),
+        'api_key' => env('LIVEKIT_API_KEY'),
+        'api_secret' => env('LIVEKIT_API_SECRET'),
+        'token_ttl_seconds' => env('LIVEKIT_TOKEN_TTL_SECONDS', 7200),
+    ],
+
     'speaking' => [
         // gemini: native audio multimodal scoring
         // qwen_omni: native audio multimodal scoring (OpenAI-compatible endpoint)
@@ -69,4 +76,3 @@ return [
     ],
 
 ];
-
