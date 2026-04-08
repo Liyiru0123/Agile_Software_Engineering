@@ -131,6 +131,13 @@ class ArticleController extends Controller
                     'route' => route('speaking.live2d'),
                     'cta' => 'Open AI Conversation',
                 ],
+                [
+                    'title' => 'Video Call',
+                    'description' => 'Enter the LiveKit-powered room for random matching and online-friend video speaking practice.',
+                    'status' => 'Available now',
+                    'route' => route('speaking.video-call'),
+                    'cta' => 'Open Video Call',
+                ],
             ],
         ]);
     }
@@ -160,6 +167,37 @@ class ArticleController extends Controller
             'expected_payload' => [
                 'message' => 'string|null',
                 'audio' => 'uploaded audio blob|null',
+                'conversation_id' => 'string|null',
+            ],
+        ], 501);
+    }
+
+    public function speakingVideoCall(): View
+    {
+        $videoCallInterface = [
+            'status' => 'available',
+            'video_call_endpoint' => route('speaking.video-call.status'),
+            'camera_input_supported' => true,
+            'microphone_input_supported' => true,
+            'notes' => [
+                'This page now uses LiveKit rooms for random speaking matches and friend video calls.',
+                'The Laravel side manages queueing, friend availability, and call-session state.',
+            ],
+        ];
+
+        return view('speaking.video-call', compact('videoCallInterface'));
+    }
+
+    public function speakingVideoCallInterface(): JsonResponse
+    {
+        return response()->json([
+            'status' => 'pending_integration',
+            'conversation_mode' => 'video_call_ai_dialogue',
+            'message' => 'Video call speaking is reserved for future integration.',
+            'expected_payload' => [
+                'message' => 'string|null',
+                'audio' => 'uploaded audio blob|null',
+                'video' => 'uploaded video blob|null',
                 'conversation_id' => 'string|null',
             ],
         ], 501);

@@ -98,6 +98,11 @@ class User extends Authenticatable
         return $this->hasMany(ConversationMessage::class, 'sender_id');
     }
 
+    public function presence(): HasOne
+    {
+        return $this->hasOne(UserPresence::class);
+    }
+
     public function isFriendsWith(User|int $user): bool
     {
         $otherUserId = $user instanceof self ? $user->id : $user;
