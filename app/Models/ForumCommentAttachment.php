@@ -34,6 +34,10 @@ class ForumCommentAttachment extends Model
 
     public function url(): string
     {
+        if ($this->isExternalPath()) {
+            return $this->path;
+        }
+
         return '/storage/'.ltrim($this->path, '/');
     }
 
@@ -44,8 +48,19 @@ class ForumCommentAttachment extends Model
 
     public function deleteFile(): void
     {
+        if ($this->isExternalPath()) {
+            return;
+        }
+
         if ($this->path && Storage::disk('public')->exists($this->path)) {
             Storage::disk('public')->delete($this->path);
         }
+    }
+
+    protected function isExternalPath(): bool
+    {
+        return str_starts_with($this->path, 'http://')
+            || str_starts_with($this->path, 'https://')
+            || str_starts_with($this->path, '//');
     }
 }

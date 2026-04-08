@@ -1,7 +1,11 @@
 @php
-    $attachments = $item->relationLoaded('attachments')
-        ? $item->attachments
-        : $item->attachments()->get();
+    $embedded = $embedded ?? false;
+    $showLabel = $showLabel ?? true;
+    $attachments = $attachmentsOverride ?? (
+        $item->relationLoaded('attachments')
+            ? $item->attachments
+            : $item->attachments()->get()
+    );
 
     if ($attachments->isEmpty() && $item->hasLegacyAttachment() && $item->attachmentUrl()) {
         $attachments = collect([
@@ -17,8 +21,10 @@
 @endphp
 
 @if($attachments->isNotEmpty())
-    <div class="mt-4 rounded-[1.5rem] border border-[#E6D3BC] bg-[#FBF7F1] p-4" data-photo-gallery>
-        <div class="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#8B6B47]">Photos</div>
+    <div class="{{ $embedded ? 'mt-5' : 'mt-4 rounded-[1.5rem] border border-[#E6D3BC] bg-[#FBF7F1] p-4' }}" data-photo-gallery>
+        @if($showLabel && ! $embedded)
+            <div class="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#8B6B47]">Photos</div>
+        @endif
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             @foreach($attachments as $attachment)
@@ -41,7 +47,7 @@
                     @if($isImage)
                         <button
                             type="button"
-                            class="flex aspect-[4/3] items-center justify-center bg-white transition hover:bg-[#FBF7F1]"
+                            class="flex aspect-[4/3] w-full items-center justify-center bg-white transition hover:bg-[#FBF7F1]"
                             title="View image"
                             data-gallery-trigger
                             data-gallery-src="{{ $attachmentUrl }}"
