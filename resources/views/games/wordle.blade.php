@@ -20,6 +20,32 @@
                 </div>
             </div>
 
+            <div class="mt-5 howto-card" aria-label="How to play Wordle">
+                <p class="howto-title">How to Play</p>
+                <ul class="howto-list">
+                    <li>Guess the hidden 5-letter word in 6 attempts.</li>
+                    <li>Type letters, then press <strong>ENTER</strong> to submit.</li>
+                    <li>Use <strong>DEL</strong> or <strong>Backspace</strong> to remove a letter.</li>
+                    <li>Only valid words in the word list will be accepted.</li>
+                    <li>After completing a 5-letter guess, press <strong>ENTER</strong> to submit it.</li>
+                    <li>Check the keyboard below to track which letters are used.</li>
+                </ul>
+                <div class="legend-row" role="list" aria-label="Color legend">
+                    <span class="legend-chip" role="listitem">
+                        <span class="legend-tile correct">A</span>
+                        <span>Correct letter, correct spot</span>
+                    </span>
+                    <span class="legend-chip" role="listitem">
+                        <span class="legend-tile present">B</span>
+                        <span>Correct letter, wrong spot</span>
+                    </span>
+                    <span class="legend-chip" role="listitem">
+                        <span class="legend-tile absent">C</span>
+                        <span>Letter not in the word</span>
+                    </span>
+                </div>
+            </div>
+
             <div class="mt-6 grid gap-2 board-wrap" id="board" aria-label="Wordle board"></div>
 
             <div class="mt-6 space-y-2 keyboard-wrap" id="keyboard" aria-label="Wordle keyboard"></div>
@@ -73,6 +99,68 @@
         font-weight: 800;
         color: #3b2722;
         line-height: 1.35;
+    }
+
+    .howto-card {
+        background: linear-gradient(135deg, #fffaf3 0%, #f5e8d9 100%);
+        border: 1px solid #dcc4af;
+        border-radius: 1rem;
+        padding: 0.85rem 0.95rem;
+        box-shadow: 0 6px 18px rgba(74, 44, 42, 0.1);
+    }
+
+    .howto-title {
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #7f5645;
+        margin-bottom: 0.4rem;
+    }
+
+    .howto-list {
+        margin: 0;
+        padding-left: 1.05rem;
+        color: #4a2c2a;
+        font-size: 0.9rem;
+        line-height: 1.45;
+    }
+
+    .legend-row {
+        margin-top: 0.55rem;
+        display: grid;
+        gap: 0.35rem;
+    }
+
+    .legend-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.82rem;
+        color: #5f463b;
+    }
+
+    .legend-tile {
+        width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 0.35rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .legend-tile.correct {
+        background: #5c8d57;
+    }
+
+    .legend-tile.present {
+        background: #c79c3d;
+    }
+
+    .legend-tile.absent {
+        background: #7a6a63;
     }
 
     .board-wrap {
