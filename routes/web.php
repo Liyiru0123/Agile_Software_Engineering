@@ -477,6 +477,9 @@ Route::get('/articles/{article}', [ArticleController::class, 'show'])->name('art
 Route::get('/articles/{article}/listening', [ArticleController::class, 'listening'])->name('articles.listening')->middleware('auth');
 Route::get('/articles/{article}/speaking', [ArticleController::class, 'speaking'])->name('articles.speaking')->middleware('auth');
 Route::post('/articles/{article}/speaking/submit', [ArticleController::class, 'submitSpeaking'])->name('articles.speaking.submit')->middleware('auth');
+Route::get('/speaking', [ArticleController::class, 'speakingHub'])->name('speaking.hub')->middleware('auth');
+Route::get('/speaking/live2d', [ArticleController::class, 'speakingLive2d'])->name('speaking.live2d')->middleware('auth');
+Route::match(['get', 'post'], '/speaking/live2d/interface', [ArticleController::class, 'speakingLive2dInterface'])->name('speaking.live2d.interface')->middleware('auth');
 Route::get('/articles/{article}/reading', [ArticleController::class, 'reading'])->name('articles.reading')->middleware('auth');
 Route::get('/articles/{article}/reading/questions', [ReadingQuestionAttemptController::class, 'index'])->name('articles.reading.questions')->middleware('auth');
 Route::post('/articles/{article}/reading/submit', [ReadingQuestionAttemptController::class, 'submit'])->name('articles.reading.submit')->middleware('auth');

@@ -15,6 +15,7 @@ use App\Services\QwenOmniAudioService;
 use App\Services\ReadingExerciseService;
 use App\Services\SpeakingExerciseService;
 use App\WritingExerciseService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -110,6 +111,58 @@ class ArticleController extends Controller
             : [];
 
         return view('articles.speaking', $data);
+    }
+
+    public function speakingHub(): View
+    {
+        return view('speaking.hub', [
+            'entryCards' => [
+                [
+                    'title' => 'Article Speaking Learning',
+                    'description' => 'Choose an article first, then enter the existing speaking training flow with shadowing clips and open-response practice.',
+                    'status' => 'Available now',
+                    'route' => route('articles.index', ['skill' => 'speaking']),
+                    'cta' => 'Open Article Speaking',
+                ],
+                [
+                    'title' => 'AI Conversation',
+                    'description' => 'Reserved for the upcoming Live2D AI dialogue mode. This page is kept as an integration entry for your teammate.',
+                    'status' => 'Integration placeholder',
+                    'route' => route('speaking.live2d'),
+                    'cta' => 'Open AI Conversation',
+                ],
+            ],
+        ]);
+    }
+
+    public function speakingLive2d(): View
+    {
+        $live2dInterface = [
+            'status' => 'pending_integration',
+            'conversation_endpoint' => route('speaking.live2d.interface'),
+            'audio_input_supported' => true,
+            'message_input_supported' => true,
+            'notes' => [
+                'This page is a reserved integration entry for the Live2D AI conversation feature.',
+                'Another team member can connect the frontend avatar and dialogue logic to the provided interface endpoint.',
+            ],
+        ];
+
+        return view('speaking.live2d', compact('live2dInterface'));
+    }
+
+    public function speakingLive2dInterface(): JsonResponse
+    {
+        return response()->json([
+            'status' => 'pending_integration',
+            'conversation_mode' => 'live2d_ai_dialogue',
+            'message' => 'Live2D AI conversation is reserved for future integration.',
+            'expected_payload' => [
+                'message' => 'string|null',
+                'audio' => 'uploaded audio blob|null',
+                'conversation_id' => 'string|null',
+            ],
+        ], 501);
     }
 
     public function submitSpeaking(Request $request, Article $article)
