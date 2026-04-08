@@ -93,6 +93,61 @@ class SelectionTranslationTest extends TestCase
         ]);
     }
 
+    public function test_save_endpoint_reuses_existing_selection_and_refreshes_message(): void
+    {
+        $user = User::factory()->create();
+        $article = Article::query()->create([
+            'title' => 'Bridge Safety',
+            'content' => "Bridge safety depends on regular inspection.\n\nMaintenance teams record each repair.",
+            'difficulty' => 2,
+            'word_count' => 10,
+        ]);
+
+        $this->actingAs($user)->postJson(route('selection.save'), [
+            'article_id' => $article->id,
+            'paragraph_index' => 0,
+            'selected_text' => 'regular inspection',
+            'translated_text' => 'first translation',
+            'source_language' => 'en',
+            'target_language' => 'zh-CN',
+        ])->assertOk();
+
+        $this->actingAs($user)->postJson(route('selection.save'), [
+            'article_id' => $article->id,
+            'paragraph_index' => 0,
+            'selected_text' => 'regular inspection',
+            'translated_text' => 'updated translation',
+            'source_language' => 'en',
+            'target_language' => 'zh-CN',
+        ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Already saved. The translation has been refreshed.')
+            ->assertJsonPath('favorite.translated_text', 'updated translation');
+
+        $this->assertDatabaseCount('selection_favorites', 1);
+    }
+
+    public function test_save_endpoint_rejects_missing_paragraph_index(): void
+    {
+        $user = User::factory()->create();
+        $article = Article::query()->create([
+            'title' => 'Academic Writing',
+            'content' => 'Only one paragraph exists here.',
+            'difficulty' => 1,
+            'word_count' => 5,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('selection.save'), [
+                'article_id' => $article->id,
+                'paragraph_index' => 2,
+                'selected_text' => 'paragraph',
+                'translated_text' => '段落',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'The selected paragraph was not found in this article.');
+    }
+
     public function test_article_page_includes_translation_metadata_for_paragraphs(): void
     {
         $user = User::factory()->create();

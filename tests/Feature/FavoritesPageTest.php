@@ -59,4 +59,50 @@ class FavoritesPageTest extends TestCase
             ->assertSee('Tunnel Ventilation')
             ->assertSee('Create Study Plan');
     }
+
+    public function test_favorites_plan_submission_creates_article_plans_only_for_selected_favorites(): void
+    {
+        $user = User::factory()->create();
+        $favoriteArticle = Article::query()->create([
+            'title' => 'Saved Article',
+            'content' => 'Saved article content for planning.',
+            'difficulty' => 1,
+            'word_count' => 5,
+        ]);
+        $otherArticle = Article::query()->create([
+            'title' => 'Unsaved Article',
+            'content' => 'This article is not in favorites.',
+            'difficulty' => 1,
+            'word_count' => 6,
+        ]);
+
+        DB::table('user_favorites')->insert([
+            'user_id' => $user->id,
+            'article_id' => $favoriteArticle->id,
+            'created_at' => now(),
+        ]);
+
+        $planDate = now()->addDay()->toDateString();
+
+        $this->actingAs($user)
+            ->post(route('favorites.plan.store'), [
+                'article_ids' => [$favoriteArticle->id, $otherArticle->id],
+                'plan_date' => $planDate,
+            ])
+            ->assertRedirect(route('favorites.plan'));
+
+        $this->assertDatabaseHas('user_plans', [
+            'user_id' => $user->id,
+            'article_id' => $favoriteArticle->id,
+            'plan_kind' => 'article',
+            'plan_date' => $planDate.' 00:00:00',
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseMissing('user_plans', [
+            'user_id' => $user->id,
+            'article_id' => $otherArticle->id,
+            'plan_date' => $planDate.' 00:00:00',
+        ]);
+    }
 }
