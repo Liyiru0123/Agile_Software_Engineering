@@ -3,8 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Article;
+use App\Models\CompanionInventory;
+use App\Models\CompanionShopItem;
+use App\Models\DailyAttendance;
 use App\Models\User;
 use App\Models\UserPlan;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,6 +42,49 @@ class DashboardPageTest extends TestCase
             ->assertSee('Dashboard Planning Article')
             ->assertSee('Analysis')
             ->assertSee('Community');
+    }
+
+    public function test_dashboard_shows_check_in_panel_and_dot_indicators(): void
+    {
+        Carbon::setTestNow('2026-04-09 10:00:00');
+
+        try {
+            $user = User::factory()->create();
+            $card = CompanionShopItem::query()->where('slug', 'makeup-checkin-card')->firstOrFail();
+
+            CompanionInventory::query()->create([
+                'user_id' => $user->id,
+                'shop_item_id' => $card->id,
+                'quantity' => 1,
+                'purchased_at' => now(),
+            ]);
+
+            DailyAttendance::query()->create([
+                'user_id' => $user->id,
+                'attendance_date' => '2026-04-07',
+                'source' => 'claim',
+                'reward_amount' => 25,
+            ]);
+
+            DailyAttendance::query()->create([
+                'user_id' => $user->id,
+                'attendance_date' => '2026-04-08',
+                'source' => 'makeup',
+                'reward_amount' => 0,
+                'shop_item_id' => $card->id,
+            ]);
+
+            $this->actingAs($user)
+                ->get(route('home', ['month' => '2026-04', 'date' => '2026-04-09']))
+                ->assertOk()
+                ->assertSee('Daily Check-In')
+                ->assertSee('Check In (+25)')
+                ->assertSee('Use Makeup Card (1)')
+                ->assertSee('title="Check-in done"', false)
+                ->assertSee('title="Check-in missed"', false);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_dashboard_quick_add_plan_can_create_a_skill_target(): void

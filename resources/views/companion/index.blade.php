@@ -48,6 +48,12 @@
     $consumables = collect($shopItems)->where('type', 'consumable')->values();
     $outfits = collect($shopItems)->where('type', 'outfit')->values();
     $items = collect($shopItems)->where('type', 'item')->values();
+    $badges = $items
+        ->filter(fn (array $item) => str_contains((string) ($item['slug'] ?? ''), 'badge'))
+        ->values();
+    $displayItems = $items
+        ->reject(fn (array $item) => str_contains((string) ($item['slug'] ?? ''), 'badge'))
+        ->values();
     $shopIcon = function (array $item): string {
         $slug = (string) ($item['slug'] ?? '');
         $type = (string) ($item['type'] ?? 'item');
@@ -57,6 +63,19 @@
             $slug === 'double-gold-ticket' => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><rect x="8" y="12" width="32" height="24" rx="8" fill="#FFF8F0" stroke="#D4B970" stroke-width="3"/><circle cx="24" cy="24" r="8" fill="#FFF3CF"/><path d="M24 19V29" stroke="#D4B970" stroke-width="3.5" stroke-linecap="round"/><path d="M19 24H29" stroke="#D4B970" stroke-width="3.5" stroke-linecap="round"/></svg>',
             $type === 'outfit' => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><path d="M18 10L24 16L30 10L36 16V36H12V16L18 10Z" fill="#FFF8F0" stroke="#8B6B47" stroke-width="3" stroke-linejoin="round"/><path d="M20 18L24 22L28 18" stroke="#D88C5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             default => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><rect x="11" y="9" width="26" height="30" rx="7" fill="#FFF8F0" stroke="#6B3D2E" stroke-width="3"/><path d="M18 18H30" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round"/><path d="M18 24H30" stroke="#D4B970" stroke-width="3" stroke-linecap="round"/><path d="M18 30H26" stroke="#D88C5A" stroke-width="3" stroke-linecap="round"/></svg>',
+        };
+    };
+    $badgeIcon = function (array $item): string {
+        $slug = (string) ($item['slug'] ?? '');
+
+        return match (true) {
+            str_contains($slug, 'writing') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 15l7-7 3 3-7 7H7v-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+            str_contains($slug, 'reading') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M4 6a3 3 0 0 1 3-3h5v16H7a3 3 0 0 0-3 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M20 6a3 3 0 0 0-3-3h-5v16h5a3 3 0 0 1 3 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+            str_contains($slug, 'listening') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M4 10h3l4-4v12l-4-4H4v-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 9c1.4 1.4 1.4 4.6 0 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M18 7c2.6 2.6 2.6 7.4 0 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+            str_contains($slug, 'forum') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v10H7l-3 3V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+            str_contains($slug, 'night') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M15 4a8 8 0 1 0 5 14.5A7 7 0 0 1 15 4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+            str_contains($slug, 'streak') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M12 3c-2 3-3 4.5-3 7a6 6 0 1 0 12 0c0-2-1-3.5-3-6-1 2-2 3-4 4-.2-1.5-.2-2.5-2-5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+            default => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4L4.2 8.7l5.4-.8L12 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
         };
     };
     $summaryIcon = function (string $key): string {
@@ -84,159 +103,27 @@
         @endif
 
         <section class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 sm:p-8 shadow-sm">
-            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
-                <div class="max-w-3xl">
-                    <div class="inline-flex items-center rounded-full bg-[#F3E7D8] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8B6B47]">
-                        Shop
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-2xl font-black text-[#4A2C2A]">Badge Wall</h2>
+                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-[#8B6B47]">Owned = Dark / Locked = Light</p>
+            </div>
+            <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                @forelse($badges as $badge)
+                    @php($owned = (bool) ($badge['owned'] ?? false))
+                    <div class="rounded-2xl border px-3 py-3 transition {{ $owned ? 'border-[#6B3D2E] bg-[#6B3D2E] text-[#FDF7EE] shadow-md' : 'border-[#E2D2BF] bg-[#F7EFE4] text-[#A28A73]' }}">
+                        <div class="inline-flex h-9 w-9 items-center justify-center rounded-full {{ $owned ? 'bg-[#F6D8A8] text-[#4A2C2A]' : 'bg-[#EFE4D5] text-[#B7A38E]' }}">
+                            {!! $badgeIcon($badge) !!}
+                        </div>
+                        <div class="mt-2 text-xs font-bold leading-5">{{ $badge['name'] }}</div>
                     </div>
-                    <h1 class="mt-4 text-3xl font-black tracking-tight text-[#4A2C2A] sm:text-4xl">
-                        Spend gold, manage consumables, and keep your daily sign-ins clean.
-                    </h1>
-                    <p class="mt-3 text-sm leading-7 text-[#8B6B47] sm:text-base">
-                        The old companion scene has been replaced with a focused shop. Sign in here each day, repair missed dates with makeup cards, and buy utility items with gold earned from study modules.
-                    </p>
-                    <div class="shop-summary-grid mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3CF]">●</span>Gold</div>
-                            <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ number_format($profile->gold) }}</div>
-                        </article>
-                        <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FBE4DB]">✓</span>Check-Ins</div>
-                            <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $attendance['claimed_count'] ?? 0 }}</div>
-                        </article>
-                        <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#E8D6C7]">↗</span>Streak</div>
-                            <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $attendance['streak'] ?? 0 }}</div>
-                        </article>
-                        <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                            <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3CF]">↺</span>Makeup Cards</div>
-                            <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $attendance['makeup_card_quantity'] ?? 0 }}</div>
-                        </article>
+                @empty
+                    <div class="col-span-full rounded-2xl border border-dashed border-[#D8C3A6] bg-[#FBF4EA] px-4 py-4 text-sm text-[#8B6B47]">
+                        No badge items yet.
                     </div>
-                </div>
-
-                <div class="rounded-[2rem] border border-[#E8D9C7] bg-[linear-gradient(180deg,#FFF8F0_0%,#F3E4D8_100%)] p-5">
-                    <svg class="w-full" viewBox="0 0 280 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="16" y="18" width="248" height="160" rx="24" fill="#FFFDF8" stroke="#D8C3A6" stroke-width="3"/>
-                        <rect x="34" y="36" width="72" height="108" rx="18" fill="#FBE4DB"/>
-                        <rect x="46" y="50" width="48" height="16" rx="8" fill="#C95F43"/>
-                        <path d="M54 101L70 85L86 101L70 117L54 101Z" fill="#FFF8F0"/>
-                        <rect x="118" y="36" width="72" height="108" rx="18" fill="#FFF3CF"/>
-                        <rect x="130" y="50" width="48" height="16" rx="8" fill="#D4B970"/>
-                        <circle cx="154" cy="102" r="18" fill="#FFF8F0"/>
-                        <path d="M154 92V112" stroke="#D4B970" stroke-width="6" stroke-linecap="round"/>
-                        <path d="M144 102H164" stroke="#D4B970" stroke-width="6" stroke-linecap="round"/>
-                        <rect x="202" y="36" width="42" height="108" rx="18" fill="#E8D6C7"/>
-                        <rect x="211" y="50" width="24" height="16" rx="8" fill="#6B3D2E"/>
-                        <rect x="210" y="90" width="26" height="42" rx="13" fill="#FFF8F0"/>
-                        <rect x="52" y="162" width="176" height="14" rx="7" fill="#4A2C2A"/>
-                    </svg>
-                    <div class="mt-3 text-sm leading-6 text-[#6B3D2E]">
-                        Clear visuals mean less guessing: sign in at the top, then scan consumables first, permanent items second.
-                    </div>
-                </div>
+                @endforelse
             </div>
         </section>
 
-        <section class="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_360px]">
-            <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-5 sm:p-6 shadow-sm">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h2 class="text-2xl font-black text-[#4A2C2A]">Monthly Check-In</h2>
-                        <p class="mt-1 text-sm text-[#8B6B47]">{{ $attendance['current_month_label'] ?? now()->format('F Y') }}</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <form method="POST" action="{{ route('shop.check-in') }}">
-                            @csrf
-                            <button type="submit"
-                                    class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-4 py-3 text-sm font-semibold text-[#F5E6D3] transition hover:bg-[#6B3D2E]"
-                                    @disabled($attendance['today_claimed'] ?? false)>
-                                {{ ($attendance['today_claimed'] ?? false) ? 'Already Checked In' : 'Check In Today (+'.$dailyRewardAmount.')' }}
-                            </button>
-                        </form>
-
-                        <form method="POST" action="{{ route('shop.check-in.makeup') }}">
-                            @csrf
-                            <button type="submit"
-                                    class="inline-flex items-center rounded-xl border border-[#D8C3A6] px-4 py-3 text-sm font-semibold text-[#6B3D2E] transition hover:bg-[#F9EFE2]"
-                                    @disabled(($attendance['makeup_card_quantity'] ?? 0) < 1 || empty($attendance['next_missed_date']))>
-                                Use Makeup Card
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="mt-4 rounded-2xl border border-[#E8D9C7] bg-white/80 px-4 py-4 text-sm leading-7 text-[#6B3D2E]">
-                    <div>Today reward: <strong>+{{ $dailyRewardAmount }} gold</strong></div>
-                    <div>Next missed date you can repair: <strong>{{ $attendance['next_missed_date'] ?? 'None this month' }}</strong></div>
-                </div>
-
-                <div class="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-[#A58A6A]">
-                    @foreach(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $dayLabel)
-                        <div class="py-2">{{ $dayLabel }}</div>
-                    @endforeach
-                </div>
-
-                <div class="mt-2 grid grid-cols-7 gap-2">
-                    @foreach($attendance['days'] ?? [] as $day)
-                        @php
-                            $tone = match ($day['status']) {
-                                'claimed' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
-                                'makeup' => 'border-amber-200 bg-amber-50 text-amber-700',
-                                'missed' => 'border-red-200 bg-red-50 text-red-700',
-                                'today' => 'border-[#D8C3A6] bg-[#F6EBDD] text-[#6B3D2E]',
-                                default => 'border-[#E8D9C7] bg-white text-[#8B6B47]',
-                            };
-                        @endphp
-                        <div class="min-h-[84px] rounded-2xl border p-2 text-left {{ $tone }}">
-                            <div class="flex items-start justify-between gap-2">
-                                <span class="text-sm font-black">{{ $day['day'] }}</span>
-                                @if($day['is_today'])
-                                    <span class="rounded-full bg-[#4A2C2A] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#F5E6D3]">Today</span>
-                                @endif
-                            </div>
-                            <div class="mt-4 text-[11px] font-semibold uppercase tracking-[0.08em]">
-                                {{ str_replace('_', ' ', $day['status']) }}
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </article>
-
-            <aside class="space-y-6">
-                <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-5 sm:p-6 shadow-sm">
-                    <h2 class="text-xl font-black text-[#4A2C2A]">How This Shop Works</h2>
-                    <div class="mt-4 space-y-3 text-sm leading-7 text-[#6B3D2E]">
-                        <div class="rounded-2xl bg-white/80 px-4 py-3">1. Earn gold by completing listening, reading, writing, and speaking modules.</div>
-                        <div class="rounded-2xl bg-white/80 px-4 py-3">2. Visit this page each day to claim your sign-in reward manually.</div>
-                        <div class="rounded-2xl bg-white/80 px-4 py-3">3. Buy makeup cards if you want to repair a missed day later in the month.</div>
-                    </div>
-                </article>
-
-                <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-5 sm:p-6 shadow-sm">
-                    <h2 class="text-xl font-black text-[#4A2C2A]">Recent Gold Activity</h2>
-                    <div class="mt-4 space-y-3">
-                        @forelse($transactions as $transaction)
-                            <div class="rounded-2xl border border-[#E8D9C7] bg-white/80 px-4 py-3">
-                                <div class="flex items-start justify-between gap-4">
-                                    <div>
-                                        <div class="text-sm font-semibold text-[#4A2C2A]">{{ ucwords($transaction['source']) }}</div>
-                                        <div class="mt-1 text-xs text-[#8B6B47]">{{ $transaction['created_at'] }}</div>
-                                    </div>
-                                    <div class="text-sm font-black {{ $transaction['amount'] >= 0 ? 'text-emerald-700' : 'text-rose-700' }}">
-                                        {{ $transaction['amount'] >= 0 ? '+' : '' }}{{ $transaction['amount'] }}
-                                    </div>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="rounded-2xl border border-dashed border-[#D8C3A6] bg-white/70 px-4 py-5 text-sm text-[#8B6B47]">
-                                No transactions yet.
-                            </div>
-                        @endforelse
-                    </div>
-                </article>
-            </aside>
-        </section>
 
         <section class="mt-8 space-y-8">
             <div>
@@ -245,12 +132,7 @@
             </div>
             <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 @foreach($consumables as $item)
-                    @php
-                        $visual = $item['visual'] ?? [];
-                        $surface = $visual['surface'] ?? '#F9EFE2';
-                        $accent = $visual['accent'] ?? '#8B6B47';
-                    @endphp
-                    <article class="rounded-[2rem] border border-[#E2CFB3] p-5 shadow-sm" style="background-color: {{ $surface }};">
+                    <article class="rounded-[2rem] border border-[#E2CFB3] p-5 shadow-sm" style="background-color: {{ data_get($item, 'visual.surface', '#F9EFE2') }};">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-white/80 shadow-sm">{!! $shopIcon($item) !!}</div>
@@ -288,12 +170,7 @@
             </div>
             <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 @foreach($outfits as $item)
-                    @php
-                        $visual = $item['visual'] ?? [];
-                        $surface = $visual['surface'] ?? '#F9EFE2';
-                        $accent = $visual['accent'] ?? '#8B6B47';
-                    @endphp
-                    <article class="rounded-[2rem] border border-[#E2CFB3] p-5 shadow-sm" style="background-color: {{ $surface }};">
+                    <article class="rounded-[2rem] border border-[#E2CFB3] p-5 shadow-sm" style="background-color: {{ data_get($item, 'visual.surface', '#F9EFE2') }};">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-white/80 shadow-sm">{!! $shopIcon($item) !!}</div>
@@ -339,13 +216,8 @@
                         </div>
                     </article>
                 @endforeach
-                @foreach($items as $item)
-                    @php
-                        $visual = $item['visual'] ?? [];
-                        $surface = $visual['surface'] ?? '#F9EFE2';
-                        $accent = $visual['accent'] ?? '#8B6B47';
-                    @endphp
-                    <article class="rounded-[2rem] border border-[#E2CFB3] p-5 shadow-sm" style="background-color: {{ $surface }};">
+                @foreach($displayItems as $item)
+                    <article class="rounded-[2rem] border border-[#E2CFB3] p-5 shadow-sm" style="background-color: {{ data_get($item, 'visual.surface', '#F9EFE2') }};">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-white/80 shadow-sm">{!! $shopIcon($item) !!}</div>

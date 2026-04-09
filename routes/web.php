@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\AnalysisController;
 use App\Http\Controllers\ArticleController;
@@ -18,6 +18,8 @@ use App\Http\Controllers\SpeakingVideoCallController;
 use App\Http\Controllers\WritingTrainingController;
 use App\Models\Article;
 use App\Models\CompanionInventory;
+use App\Models\CompanionProfile;
+use App\Models\CompanionTransaction;
 use App\Models\CompanionShopItem;
 use App\Models\Conversation;
 use App\Models\DailyAttendance;
@@ -216,6 +218,45 @@ Route::get('/', function (Request $request) {
         'missed_count' => $calendarCheckins->where('status', 'missed')->count(),
     ];
 
+    $companionProfile = CompanionProfile::query()->firstOrCreate(
+        ['user_id' => $user->id],
+        [
+            'gold' => 0,
+            'total_gold_earned' => 0,
+        ]
+    );
+
+    $companionTransactions = CompanionTransaction::query()
+        ->where('user_id', $user->id)
+        ->latest('id')
+        ->take(6)
+        ->get()
+        ->map(function (CompanionTransaction $transaction) {
+            $normalizedSource = in_array($transaction->source, ['reading_complete', 'writing_complete'], true)
+                ? 'listening_complete'
+                : $transaction->source;
+
+            return [
+                'type' => $transaction->type,
+                'source' => str_replace('_', ' ', $normalizedSource),
+                'amount' => $transaction->amount,
+                'created_at' => optional($transaction->created_at)?->diffForHumans(),
+            ];
+        });
+
+    $monthlyGoldEarned = CompanionTransaction::query()
+        ->where('user_id', $user->id)
+        ->where('type', 'earn')
+        ->whereBetween('created_at', [$monthStart->copy()->startOfDay(), $monthEnd->copy()->endOfDay()])
+        ->sum('amount');
+
+    $pointsSummary = [
+        'gold' => (int) $companionProfile->gold,
+        'total_earned' => (int) $companionProfile->total_gold_earned,
+        'monthly_earned' => (int) $monthlyGoldEarned,
+        'transactions' => $companionTransactions,
+    ];
+
     $favoritePlanArticles = Article::query()
         ->join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
         ->where('user_favorites.user_id', $user->id)
@@ -325,6 +366,7 @@ Route::get('/', function (Request $request) {
         'calendarPlans',
         'calendarCheckins',
         'checkinSummary',
+        'pointsSummary',
         'selectedTasks',
         'overdueTasks',
         'weeklySummary',
@@ -682,3 +724,4 @@ Route::get('/register', function () {
 })->name('register')->middleware('guest');
 
 Route::post('/register', [RegisterController::class, 'register'])->name('register.post');
+

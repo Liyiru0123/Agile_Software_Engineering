@@ -55,26 +55,6 @@
                 <h1 class="mt-4 text-3xl sm:text-4xl font-black tracking-tight text-[#4A2C2A]">
                     Plan the week, finish today, and keep the next task obvious.
                 </h1>
-                <div class="mt-5 flex flex-wrap gap-3 text-sm text-[#8B6B47]">
-                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FBE4DB]">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M5 12H19" stroke="#C95F43" stroke-width="2.2" stroke-linecap="round"/><path d="M12 5V19" stroke="#C95F43" stroke-width="2.2" stroke-linecap="round"/></svg>
-                        </span>
-                        Quick planning
-                    </span>
-                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3CF]">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M4 8H20" stroke="#C9A961" stroke-width="2.2" stroke-linecap="round"/><path d="M7 12H17" stroke="#C9A961" stroke-width="2.2" stroke-linecap="round"/><path d="M10 16H14" stroke="#C9A961" stroke-width="2.2" stroke-linecap="round"/></svg>
-                        </span>
-                        Calendar-led view
-                    </span>
-                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2">
-                        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#E8D6C7]">
-                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M6 12L10 16L18 8" stroke="#6B3D2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        </span>
-                        One clear next step
-                    </span>
-                </div>
 
             </div>
 
@@ -134,39 +114,41 @@
                 </div>
             </div>
 
-            <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Weekly Progress</div>
-                            <div class="mt-1 text-lg font-black text-[#4A2C2A]">{{ $weeklySummary['label'] }}</div>
+            <div class="mt-4 rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Daily Check-In</div>
+                        <div class="mt-1 text-sm text-[#6B3D2E]">
+                            Today reward: <strong>+{{ $checkinSummary['daily_reward_amount'] }} gold</strong>
+                            · Next missed date: <strong>{{ $checkinSummary['next_missed_date'] ?? 'None' }}</strong>
                         </div>
-                        <div class="text-right">
-                            <div class="text-2xl font-black text-[#4A2C2A]">{{ $weeklySummary['completion_rate'] }}%</div>
-                            <div class="text-xs text-[#8B6B47]">{{ $weeklySummary['completed'] }}/{{ $weeklySummary['total'] }}</div>
+                        <div class="mt-1 text-xs text-[#8B6B47]">
+                            Claimed {{ $checkinSummary['claimed_count'] }}, Makeup {{ $checkinSummary['makeup_count'] }}, Missed {{ $checkinSummary['missed_count'] }}
                         </div>
                     </div>
-                    <div class="mt-3 h-2 rounded-full bg-[#EFE2D3]">
-                        <div class="h-2 rounded-full bg-[#4A2C2A]" style="width: {{ $weeklySummary['completion_rate'] }}%"></div>
-                    </div>
-                </div>
+                    <div class="flex flex-wrap gap-2">
+                        <form method="POST" action="{{ route('shop.check-in') }}">
+                            @csrf
+                            <button type="submit"
+                                    class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] transition hover:bg-[#6B3D2E]"
+                                    @disabled($checkinSummary['today_claimed'])>
+                                {{ $checkinSummary['today_claimed'] ? 'Already Checked In' : 'Check In (+'.$checkinSummary['daily_reward_amount'].')' }}
+                            </button>
+                        </form>
 
-                <div class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Monthly Progress</div>
-                            <div class="mt-1 text-lg font-black text-[#4A2C2A]">{{ $monthlySummary['label'] }}</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-2xl font-black text-[#4A2C2A]">{{ $monthlySummary['completion_rate'] }}%</div>
-                            <div class="text-xs text-[#8B6B47]">{{ $monthlySummary['completed'] }}/{{ $monthlySummary['total'] }}</div>
-                        </div>
-                    </div>
-                    <div class="mt-3 h-2 rounded-full bg-[#EFE2D3]">
-                        <div class="h-2 rounded-full bg-[#C9A961]" style="width: {{ $monthlySummary['completion_rate'] }}%"></div>
+                        <form method="POST" action="{{ route('shop.check-in.makeup') }}">
+                            @csrf
+                            <button type="submit"
+                                    class="inline-flex items-center rounded-xl border border-[#D8C3A6] px-3 py-2 text-xs font-semibold text-[#6B3D2E] transition hover:bg-[#F9EFE2]"
+                                    @disabled(($checkinSummary['makeup_card_quantity'] ?? 0) < 1 || empty($checkinSummary['next_missed_date']))>
+                                Use Makeup Card ({{ $checkinSummary['makeup_card_quantity'] ?? 0 }})
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
+
+
 
             <div class="mt-6 grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-[#A58A6A]">
                 @foreach(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $dayLabel)
@@ -185,6 +167,10 @@
                             'skipped' => 0,
                             'completion_rate' => 0,
                             'has_overdue' => false,
+                        ]);
+                        $checkinMeta = $calendarCheckins->get($dateString, [
+                            'status' => 'upcoming',
+                            'source' => null,
                         ]);
                         $isCurrentMonth = $calendarDay->month === $currentMonthValue->month;
                         $isSelected = $selectedDateValue->isSameDay($calendarDay);
@@ -233,16 +219,32 @@
                             @else
                                 <div class="text-xs opacity-75">No plan</div>
                             @endif
+
+                            @if($isCurrentMonth && ($checkinMeta['status'] === 'claimed' || $checkinMeta['status'] === 'makeup' || $checkinMeta['status'] === 'missed'))
+                                <div class="mt-2 flex justify-start">
+                                    @if($checkinMeta['status'] === 'claimed' || $checkinMeta['status'] === 'makeup')
+                                        <span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" title="Check-in done"></span>
+                                    @else
+                                        <span class="inline-block h-2.5 w-2.5 rounded-full bg-red-500" title="Check-in missed"></span>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
                     </a>
                 @endforeach
             </div>
 
-            <div class="mt-5 flex flex-wrap gap-4 text-xs font-medium text-[#8B6B47]">
-                <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-emerald-100 border border-emerald-200"></i>All done</span>
-                <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-amber-100 border border-amber-200"></i>Partially done</span>
-                <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-[#F6EBDD] border border-[#D8C3A6]"></i>Planned</span>
-                <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-red-100 border border-red-200"></i>Overdue</span>
+            <div class="mt-5 space-y-2 text-xs font-medium text-[#8B6B47]">
+                <div class="flex flex-wrap gap-4">
+                    <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-emerald-100 border border-emerald-200"></i>All done</span>
+                    <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-amber-100 border border-amber-200"></i>Partially done</span>
+                    <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-[#F6EBDD] border border-[#D8C3A6]"></i>Planned</span>
+                    <span class="inline-flex items-center gap-2"><i class="h-3 w-3 rounded bg-red-100 border border-red-200"></i>Overdue</span>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                    <span class="inline-flex items-center gap-2"><span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Check-in done</span>
+                    <span class="inline-flex items-center gap-2"><span class="inline-block h-2.5 w-2.5 rounded-full bg-red-500"></span>Check-in missed</span>
+                </div>
             </div>
         </article>
 
@@ -496,7 +498,51 @@
 
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <article class="flex h-full flex-col rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">
+                        <svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="14" fill="#FFF3CF" stroke="#C9A961" stroke-width="3"/><path d="M24 17V24L29 27" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <h3 class="text-lg font-black text-[#4A2C2A]">Gold Management</h3>
+                </div>
+
+                <div class="mt-5 min-h-[8.5rem] rounded-[1.5rem] bg-white/80 px-3 py-3">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="rounded-xl bg-[#FFF8F0] px-2.5 py-2.5">
+                            <div class="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">Gold</div>
+                            <div class="mt-1 text-xl font-black text-[#4A2C2A]">{{ $pointsSummary['gold'] }}</div>
+                        </div>
+                        <div class="rounded-xl bg-[#FFF8F0] px-2.5 py-2.5">
+                            <div class="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">Month</div>
+                            <div class="mt-1 text-xl font-black text-[#4A2C2A]">{{ $pointsSummary['monthly_earned'] }}</div>
+                        </div>
+                        <div class="rounded-xl bg-[#FFF8F0] px-2.5 py-2.5">
+                            <div class="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">Total</div>
+                            <div class="mt-1 text-xl font-black text-[#4A2C2A]">{{ $pointsSummary['total_earned'] }}</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 space-y-2">
+                        @forelse($pointsSummary['transactions'] as $transaction)
+                            <div class="flex items-center justify-between rounded-xl bg-[#FFF8F0] px-2.5 py-2 text-xs">
+                                <span class="text-[#6B3D2E] truncate">{{ ucwords($transaction['source']) }}</span>
+                                <span class="font-bold {{ $transaction['amount'] >= 0 ? 'text-emerald-700' : 'text-rose-700' }}">{{ $transaction['amount'] >= 0 ? '+' : '' }}{{ $transaction['amount'] }}</span>
+                            </div>
+                        @empty
+                            <div class="rounded-xl border border-dashed border-[#D8C3A6] bg-white/70 px-2.5 py-2 text-xs text-[#8B6B47]">No points records yet.</div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-4 flex flex-wrap gap-2">
+                    <a href="{{ route('shop.index') }}"
+                       class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
+                        Open Shop
+                    </a>
+                </div>
+            </article>
+
             <article class="flex h-full flex-col rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
                 <div class="flex items-center gap-3">
                     <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('favorites') !!}</div>

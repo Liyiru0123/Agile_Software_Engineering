@@ -20,7 +20,7 @@ class CompanionFeatureTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Shop')
-            ->assertSee('Monthly Check-In')
+            ->assertSee('Badge Wall')
             ->assertSee('Makeup Check-In Card')
             ->assertSee('Sunset Ribbon');
     }
@@ -30,6 +30,7 @@ class CompanionFeatureTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
+            ->from(route('shop.index'))
             ->post(route('shop.check-in'))
             ->assertRedirect(route('shop.index'));
 
@@ -42,6 +43,7 @@ class CompanionFeatureTest extends TestCase
         ]);
 
         $this->actingAs($user)
+            ->from(route('shop.index'))
             ->post(route('shop.check-in'))
             ->assertRedirect(route('shop.index'));
 
@@ -67,10 +69,12 @@ class CompanionFeatureTest extends TestCase
         ]);
 
         $this->actingAs($user)
+            ->from(route('shop.index'))
             ->post(route('shop.purchase', $item))
             ->assertRedirect(route('shop.index'));
 
         $this->actingAs($user)
+            ->from(route('shop.index'))
             ->post(route('shop.purchase', $item))
             ->assertRedirect(route('shop.index'));
 
@@ -109,6 +113,7 @@ class CompanionFeatureTest extends TestCase
         ]);
 
         $this->actingAs($user)
+            ->from(route('shop.index'))
             ->post(route('shop.check-in.makeup'))
             ->assertRedirect(route('shop.index'));
 
