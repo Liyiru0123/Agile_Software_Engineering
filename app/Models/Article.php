@@ -7,14 +7,44 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Article extends Model
 {
-    protected $fillable = ['title', 'content', 'audio_url', 'difficulty', 'word_count'];
+    protected $fillable = [
+        'subject',
+        'title',
+        'slug',
+        'author',
+        'source',
+        'level',
+        'content',
+        'audio_url',
+        'video_url',
+        'resource_type',
+        'accent',
+        'difficulty',
+        'word_count',
+        'total_duration',
+    ];
 
     protected $casts = [
         'difficulty' => 'integer',
         'word_count' => 'integer',
+        'total_duration' => 'integer',
     ];
 
+    protected $appends = ['has_audio'];
+
     public $timestamps = false;
+
+    protected static function booted(): void
+    {
+        static::creating(function (Article $article) {
+            $article->content ??= '';
+        });
+    }
+
+    public function getHasAudioAttribute(): bool
+    {
+        return filled($this->audio_url);
+    }
 
     public function exercises(): HasMany
     {

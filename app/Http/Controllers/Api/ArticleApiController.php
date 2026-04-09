@@ -22,7 +22,7 @@ class ArticleApiController extends Controller
     public function index(): JsonResponse
     {
         $articles = Article::query()
-            ->latest('article_id')
+            ->latest('id')
             ->get()
             ->map(fn (Article $article) => $this->formatArticleSummary($article))
             ->values();
@@ -48,6 +48,7 @@ class ArticleApiController extends Controller
                 'author' => $payload['author'] ?? null,
                 'source' => $payload['source'] ?? null,
                 'level' => $payload['level'],
+                'content' => $content,
                 'resource_type' => $payload['resource_type'] ?? ($storedAudio ? 'audio' : 'text'),
                 'accent' => $payload['accent'] ?? 'US',
                 'audio_url' => $storedAudio,
@@ -93,6 +94,7 @@ class ArticleApiController extends Controller
 
             if (array_key_exists('content', $payload)) {
                 $content = trim($payload['content']);
+                $updates['content'] = $content;
                 $updates['word_count'] = $this->processor->countWords($content);
             }
 
@@ -300,3 +302,4 @@ class ArticleApiController extends Controller
         ], $status);
     }
 }
+

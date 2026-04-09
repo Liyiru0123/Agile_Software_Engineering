@@ -6,6 +6,7 @@ use App\Models\Article;
 use App\Models\Exercise;
 use App\Models\Submission;
 use App\Services\CompanionService;
+use App\Services\ListeningPlanCompletionService;
 use App\Services\ReadingExerciseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ class ReadingQuestionAttemptController extends Controller
 {
     public function __construct(
         protected ReadingExerciseService $readingExerciseService,
-        protected CompanionService $companionService
+        protected CompanionService $companionService,
+        protected ListeningPlanCompletionService $listeningPlanCompletionService
     ) {
     }
 
@@ -36,6 +38,7 @@ class ReadingQuestionAttemptController extends Controller
 
         $result = $this->readingExerciseService->evaluate($article, $payload['answers']);
         $reward = null;
+        $completedPlan = null;
 
         if ($request->user()) {
             $readingExercise = Exercise::query()
@@ -64,11 +67,15 @@ class ReadingQuestionAttemptController extends Controller
             }
 
             $reward = $this->companionService->grantLearningReward($request->user(), 'reading', $article->id);
+            $completedPlan = $this->listeningPlanCompletionService->syncArticlePlan($request->user()->id, $article);
         }
 
         return response()->json(array_merge(
             $result,
-            ['companion_reward' => $reward]
+            [
+                'companion_reward' => $reward,
+                'plan_auto_completed' => $completedPlan !== null,
+            ]
         ));
     }
 }

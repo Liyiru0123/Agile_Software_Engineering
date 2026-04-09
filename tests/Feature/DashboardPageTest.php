@@ -120,6 +120,16 @@ class DashboardPageTest extends TestCase
         ]);
 
         $this->assertNotNull($plan->fresh()->completed_at);
+
+        $this->actingAs($user)
+            ->get(route('home', [
+                'date' => now()->toDateString(),
+                'month' => now()->format('Y-m'),
+            ]))
+            ->assertOk()
+            ->assertSee('1/1 done')
+            ->assertSee('All done')
+            ->assertDontSee('1 pending');
     }
 
     public function test_dashboard_plan_delete_rejects_non_owner(): void

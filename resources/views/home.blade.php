@@ -255,7 +255,17 @@
                         <div class="mt-4 space-y-1">
                             @if($dayMeta['total'] > 0)
                                 <div class="text-xs font-semibold">{{ $dayMeta['completed'] }}/{{ $dayMeta['total'] }} done</div>
-                                <div class="text-[11px] opacity-80">{{ $dayMeta['pending'] }} pending</div>
+                                @if($dayMeta['completed'] === $dayMeta['total'])
+                                    <div class="text-[11px] opacity-80">All done</div>
+                                @elseif($dayMeta['pending'] > 0 && $dayMeta['completed'] > 0)
+                                    <div class="text-[11px] opacity-80">Partially done, {{ $dayMeta['pending'] }} pending</div>
+                                @elseif($dayMeta['pending'] > 0)
+                                    <div class="text-[11px] opacity-80">{{ $dayMeta['pending'] }} pending</div>
+                                @elseif($dayMeta['skipped'] === $dayMeta['total'])
+                                    <div class="text-[11px] opacity-80">Skipped</div>
+                                @else
+                                    <div class="text-[11px] opacity-80">No pending tasks</div>
+                                @endif
                             @else
                                 <div class="text-xs opacity-75">No plan</div>
                             @endif
@@ -308,14 +318,14 @@
                                         @if($task->plan_kind === 'skill' && $task->skill_type)
                                             {{ ucfirst($task->skill_type) }} training target
                                             @if($task->target_count)
-                                                · {{ $task->target_count }} sets
+                                                璺?{{ $task->target_count }} sets
                                             @endif
                                         @elseif($task->plan_kind === 'custom')
                                             Custom study task
                                         @else
                                             Article study task
                                         @endif
-                                        · {{ $task->plan_date?->format('M j, Y') }}
+                                        璺?{{ $task->plan_date?->format('M j, Y') }}
                                     </div>
                                 </div>
                                 <span class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] {{ $badgeClasses }}">
@@ -506,7 +516,7 @@
                                 <div class="text-sm font-semibold text-[#4A2C2A]">{{ $task->displayTitle() }}</div>
                                 <div class="mt-1 text-xs text-[#8B6B47]">
                                     {{ $task->plan_kind === 'skill' ? ucfirst((string) $task->skill_type).' training' : ($task->plan_kind === 'custom' ? 'Custom task' : 'Article task') }}
-                                    · {{ $task->plan_date?->format('M j, Y') }}
+                                    璺?{{ $task->plan_date?->format('M j, Y') }}
                                 </div>
                             </div>
                         @endforeach
@@ -754,3 +764,4 @@
 })();
 </script>
 @endpush
+

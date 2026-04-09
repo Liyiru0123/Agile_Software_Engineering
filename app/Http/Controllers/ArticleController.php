@@ -13,6 +13,7 @@ use App\Services\GeminiAudioService;
 use App\Services\OllamaSpeakingService;
 use App\Services\QwenOmniAudioService;
 use App\Services\ReadingExerciseService;
+use App\Services\SkillPlanCompletionService;
 use App\Services\SpeakingExerciseService;
 use App\WritingExerciseService;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,7 @@ class ArticleController extends Controller
         protected ArticleTextProcessor $processor,
         protected ListeningExerciseService $listeningExerciseService,
         protected ReadingExerciseService $readingExerciseService,
+        protected SkillPlanCompletionService $skillPlanCompletionService,
         protected SpeakingExerciseService $speakingExerciseService,
         protected WritingExerciseService $writingExerciseService,
         protected CompanionService $companionService,
@@ -391,8 +393,10 @@ class ArticleController extends Controller
         }
 
         $reward = null;
+        $completedSkillPlans = 0;
         if ($request->user()) {
             $reward = $this->companionService->grantLearningReward($request->user(), 'speaking', $article->id);
+            $completedSkillPlans = $this->skillPlanCompletionService->syncForSubmission($request->user()->id, 'speaking', $submission->created_at);
         }
 
         return response()->json([
@@ -401,6 +405,7 @@ class ArticleController extends Controller
             'submission_id' => $submission->id,
             'evaluation' => $evaluation,
             'companion_reward' => $reward,
+            'skill_plan_auto_completed' => $completedSkillPlans > 0,
         ]);
     }
 
@@ -849,7 +854,7 @@ PROMPT;
             return $audioUrl;
         }
 
-        return asset($audioUrl);
+        return Storage::url(ltrim($audioUrl, '/'));
     }
 
     protected function difficultyLabel(int $difficulty): string

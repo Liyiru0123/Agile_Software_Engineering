@@ -39,7 +39,7 @@
                 @endif
 
                 <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
-                    <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Paragraph Shadowing Clips</h2>
+                    <h2 class="text-2xl font-bold text-[#4A2C2A] mb-2">Short Shadowing Clips</h2>
                     <p class="text-[#6B3D2E] leading-6 mb-6">Repeat one paragraph clip at a time. Scoring focuses on accuracy, fluency, and pronunciation.</p>
 
                     <div class="space-y-4">
@@ -650,3 +650,4 @@ window.addEventListener('beforeunload', () => {
 });
 </script>
 @endpush
+

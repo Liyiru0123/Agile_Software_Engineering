@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Article;
 use App\Models\Exercise;
 use App\Services\CompanionService;
+use App\Services\ListeningPlanCompletionService;
 use App\WritingExerciseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ class WritingTrainingController extends Controller
 {
     public function __construct(
         protected WritingExerciseService $writingExerciseService,
-        protected CompanionService $companionService
+        protected CompanionService $companionService,
+        protected ListeningPlanCompletionService $listeningPlanCompletionService
     ) {
     }
 
@@ -36,13 +38,16 @@ class WritingTrainingController extends Controller
         );
 
         $reward = null;
+        $completedPlan = null;
         if ($request->user()) {
             $reward = $this->companionService->grantLearningReward($request->user(), 'writing', $article->id);
+            $completedPlan = $this->listeningPlanCompletionService->syncArticlePlan($request->user()->id, $article);
         }
 
         return response()->json([
             'result' => $result,
             'companion_reward' => $reward,
+            'plan_auto_completed' => $completedPlan !== null,
         ]);
     }
 }
