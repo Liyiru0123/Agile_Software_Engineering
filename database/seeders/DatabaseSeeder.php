@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             WordleWordSeeder::class,
             AdminUserSeeder::class,
             ForumPostSeeder::class,
+            DemoUserSeeder::class,
         ]);
 
         $this->command?->info('All seed data imported successfully.');
