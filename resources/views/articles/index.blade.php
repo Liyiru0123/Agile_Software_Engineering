@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Learning - EAPlus')
+@section('title', 'Articles - EAPlus')
 
 @push('styles')
 <style>
@@ -52,7 +52,7 @@
 
     <div class="mb-8">
         <div class="flex items-center justify-between gap-4">
-            <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">Article Speaking Learning</h1>
+            <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">Articles</h1>
             <a href="{{ route('speaking.hub') }}"
                class="inline-flex items-center rounded-xl border border-[#D8C3A6] bg-[#FFF8F0] px-4 py-2 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
                 Back to Speaking Hub

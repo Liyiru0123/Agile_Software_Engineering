@@ -112,7 +112,7 @@ class CompanionController extends Controller
 
         if ($alreadyCheckedIn) {
             return redirect()
-                ->route('shop.index')
+                ->back()
                 ->with('error', 'Today has already been checked in.');
         }
 
@@ -133,7 +133,7 @@ class CompanionController extends Controller
         ]);
 
         return redirect()
-            ->route('shop.index')
+            ->back()
             ->with('status', 'Today checked in successfully. +'.$reward['amount'].' gold.');
     }
 
@@ -143,7 +143,7 @@ class CompanionController extends Controller
         $card = CompanionShopItem::query()->where('benefit_key', 'makeup_checkin')->first();
 
         if (! $card) {
-            return redirect()->route('shop.index')->with('error', 'Makeup card item is unavailable.');
+            return redirect()->back()->with('error', 'Makeup card item is unavailable.');
         }
 
         $inventory = CompanionInventory::query()
@@ -152,12 +152,12 @@ class CompanionController extends Controller
             ->first();
 
         if (! $inventory || $inventory->quantity < 1) {
-            return redirect()->route('shop.index')->with('error', 'You do not have any makeup check-in cards.');
+            return redirect()->back()->with('error', 'You do not have any makeup check-in cards.');
         }
 
         $targetDate = $this->resolveLatestMissedDate($user->id);
         if (! $targetDate) {
-            return redirect()->route('shop.index')->with('error', 'There is no missed day available to repair this month.');
+            return redirect()->back()->with('error', 'There is no missed day available to repair this month.');
         }
 
         DB::transaction(function () use ($user, $card, $inventory, $targetDate) {
@@ -190,7 +190,7 @@ class CompanionController extends Controller
         });
 
         return redirect()
-            ->route('shop.index')
+            ->back()
             ->with('status', 'One missed sign-in day has been repaired.');
     }
 
