@@ -39,15 +39,6 @@
         $pageSubheading = $currentSkill === 'speaking'
             ? 'Browse speaking-ready articles and practice prompts'
             : 'Browse listening-ready articles and transcript tasks';
-        $heroImage = 'https://images.pexels.com/photos/20449662/pexels-photo-20449662.jpeg?auto=compress&cs=tinysrgb&w=1200';
-        $articleCoverImages = [
-            'https://images.pexels.com/photos/6549849/pexels-photo-6549849.jpeg?auto=compress&cs=tinysrgb&w=1200',
-            'https://images.pexels.com/photos/6549858/pexels-photo-6549858.jpeg?auto=compress&cs=tinysrgb&w=1200',
-            'https://images.pexels.com/photos/6550111/pexels-photo-6550111.jpeg?auto=compress&cs=tinysrgb&w=1200',
-            'https://images.pexels.com/photos/15361509/pexels-photo-15361509.jpeg?auto=compress&cs=tinysrgb&w=1200',
-            'https://images.pexels.com/photos/20449662/pexels-photo-20449662.jpeg?auto=compress&cs=tinysrgb&w=1200',
-            'https://images.pexels.com/photos/6549849/pexels-photo-6549849.jpeg?auto=compress&cs=tinysrgb&w=1200',
-        ];
     @endphp
 
     <div class="mb-8">
@@ -132,7 +123,8 @@
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($articles as $article)
                 @php
-                    $coverImage = $articleCoverImages[$loop->index % count($articleCoverImages)];
+                    $fallbackCoverImage = 'https://picsum.photos/seed/eaplus-article-'.$article->id.'/1200/800';
+                    $coverImage = filled($article->cover_image_url) ? $article->cover_image_url : $fallbackCoverImage;
                 @endphp
                 <article class="bg-white border-2 border-[#6B3D2E] rounded-lg p-6 shadow-md hover:shadow-xl transition-all duration-200 hover:-translate-y-1 group flex flex-col h-full">
                     <div class="mb-4 overflow-hidden rounded-2xl">

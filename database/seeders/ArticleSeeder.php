@@ -59,6 +59,13 @@ class ArticleSeeder extends Seeder
                     'title' => (string) $article['title'],
                     'content' => (string) $article['content'],
                     'audio_url' => $article['audio_url'] ?? null,
+                    'cover_image_url' => $article['cover_image_url']
+                        ?? $this->defaultCoverImageUrl(
+                            (int) $article['article_id'],
+                            $article['subject'] ?? null,
+                            (string) $article['title'],
+                            (string) $article['content']
+                        ),
                     'difficulty' => (int) ($article['difficulty'] ?? 1),
                     'word_count' => (int) ($article['word_count'] ?? 0),
                 ]);
@@ -220,5 +227,45 @@ class ArticleSeeder extends Seeder
         $sentence = str_replace(["\r", "\n"], ' ', $sentence);
 
         return trim((string) preg_replace('/\s+/', ' ', $sentence));
+    }
+
+    protected function defaultCoverImageUrl(int $articleId, ?string $subject, string $title, string $content): string
+    {
+        $subjectText = strtolower(trim((string) $subject));
+        $text = strtolower($title.' '.$content.' '.$subjectText);
+
+        $theme = 'general';
+
+        if (str_contains($subjectText, 'computer')) {
+            $theme = 'computer_science';
+        } elseif (str_contains($subjectText, 'mathematics') || str_contains($subjectText, 'math')) {
+            $theme = 'mathematics';
+        } elseif (str_contains($subjectText, 'civil')) {
+            $theme = 'civil_engineering';
+        } elseif (str_contains($subjectText, 'mechanical') && str_contains($subjectText, 'transportation')) {
+            $theme = 'transportation';
+        } elseif (str_contains($subjectText, 'mechanical')) {
+            $theme = 'mechanical_engineering';
+        }
+
+        if ($theme === 'general') {
+            if (preg_match('/\b(algorithm|software|database|network|ai|machine learning|code|programming|cyber)\b/i', $text)) {
+                $theme = 'computer_science';
+            } elseif (preg_match('/\b(calculus|algebra|geometry|equation|statistics|probability|theorem)\b/i', $text)) {
+                $theme = 'mathematics';
+            } elseif (preg_match('/\b(bridge|concrete|building|foundation|construction|structural|infrastructure)\b/i', $text)) {
+                $theme = 'civil_engineering';
+            } elseif (preg_match('/\b(engine|manufacturing|robot|gear|machine|thermodynamics)\b/i', $text)) {
+                $theme = 'mechanical_engineering';
+            } elseif (preg_match('/\b(transport|rail|vehicle|traffic|aerospace|logistics|ship|aviation)\b/i', $text)) {
+                $theme = 'transportation';
+            } elseif (preg_match('/\b(energy|solar|wind|carbon|climate|sustainability|environment)\b/i', $text)) {
+                $theme = 'energy_environment';
+            }
+        }
+
+        $seed = rawurlencode('eaplus-'.$theme.'-'.$articleId.'-'.substr(md5($title.'|'.$content), 0, 12));
+
+        return 'https://picsum.photos/seed/'.$seed.'/1200/800';
     }
 }

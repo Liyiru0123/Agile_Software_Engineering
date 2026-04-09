@@ -282,14 +282,14 @@
                                         @if($task->plan_kind === 'skill' && $task->skill_type)
                                             {{ ucfirst($task->skill_type) }} training target
                                             @if($task->target_count)
-                                                璺?{{ $task->target_count }} sets
+                                                | {{ $task->target_count }} sets
                                             @endif
                                         @elseif($task->plan_kind === 'custom')
                                             Custom study task
                                         @else
                                             Article study task
                                         @endif
-                                        璺?{{ $task->plan_date?->format('M j, Y') }}
+                                        | {{ $task->plan_date?->format('M j, Y') }}
                                     </div>
                                 </div>
                                 <span class="rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] {{ $badgeClasses }}">
@@ -478,7 +478,7 @@
                                 <div class="text-sm font-semibold text-[#4A2C2A]">{{ $task->displayTitle() }}</div>
                                 <div class="mt-1 text-xs text-[#8B6B47]">
                                     {{ $task->plan_kind === 'skill' ? ucfirst((string) $task->skill_type).' training' : ($task->plan_kind === 'custom' ? 'Custom task' : 'Article task') }}
-                                    璺?{{ $task->plan_date?->format('M j, Y') }}
+                                    | {{ $task->plan_date?->format('M j, Y') }}
                                 </div>
                             </div>
                         @endforeach

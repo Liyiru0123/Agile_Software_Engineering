@@ -16,6 +16,7 @@ class Article extends Model
         'level',
         'content',
         'audio_url',
+        'cover_image_url',
         'video_url',
         'resource_type',
         'accent',

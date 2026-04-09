@@ -52,10 +52,22 @@ class ArticleApiController extends Controller
                 'resource_type' => $payload['resource_type'] ?? ($storedAudio ? 'audio' : 'text'),
                 'accent' => $payload['accent'] ?? 'US',
                 'audio_url' => $storedAudio,
+                'cover_image_url' => $payload['cover_image_url'] ?? null,
                 'video_url' => $payload['video_url'] ?? null,
                 'word_count' => $this->processor->countWords($content),
                 'total_duration' => $payload['total_duration'] ?? 0,
             ]);
+
+            if (! filled($article->cover_image_url)) {
+                $article->forceFill([
+                    'cover_image_url' => $this->buildThematicCoverUrl(
+                        $payload['subject'] ?? null,
+                        $payload['title'] ?? '',
+                        $content,
+                        (int) $article->id
+                    ),
+                ])->save();
+            }
 
             $article->segments()->createMany($this->processor->buildSegments($content));
 
@@ -82,7 +94,7 @@ class ArticleApiController extends Controller
         $article = DB::transaction(function () use ($article, $payload, $request) {
             $updates = [];
 
-            foreach (['subject', 'title', 'author', 'source', 'level', 'resource_type', 'accent', 'total_duration', 'video_url'] as $field) {
+            foreach (['subject', 'title', 'author', 'source', 'level', 'resource_type', 'accent', 'total_duration', 'video_url', 'cover_image_url'] as $field) {
                 if (array_key_exists($field, $payload)) {
                     $updates[$field] = $payload[$field];
                 }
@@ -165,6 +177,7 @@ class ArticleApiController extends Controller
             'resource_type' => ['sometimes', 'nullable', Rule::in(['text', 'audio', 'video'])],
             'accent' => ['sometimes', 'nullable', Rule::in(['US', 'UK'])],
             'video_url' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'cover_image_url' => ['sometimes', 'nullable', 'string', 'max:500'],
             'total_duration' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'audio_file' => ['sometimes', 'nullable', 'file', 'mimes:mp3,wav,m4a,aac,ogg', 'max:51200'],
         ];
@@ -214,6 +227,8 @@ class ArticleApiController extends Controller
             'resource_type' => $article->resource_type,
             'word_count' => $article->word_count,
             'has_audio' => $article->has_audio,
+            'cover_image_url' => $article->cover_image_url
+                ?: $this->buildThematicCoverUrl($article->subject, $article->title, $article->content, (int) $article->id),
             'created_at' => optional($article->created_at)?->toISOString(),
         ];
     }
@@ -234,6 +249,8 @@ class ArticleApiController extends Controller
             'word_count' => $article->word_count,
             'total_duration' => $article->total_duration,
             'audio_url' => $article->audio_url,
+            'cover_image_url' => $article->cover_image_url
+                ?: $this->buildThematicCoverUrl($article->subject, $article->title, $article->content, (int) $article->id),
             'video_url' => $article->video_url,
             'has_audio' => $article->has_audio,
             'segment_count' => $article->relationLoaded('segments')
@@ -291,6 +308,46 @@ class ArticleApiController extends Controller
         if (Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
         }
+    }
+
+    private function buildThematicCoverUrl(?string $subject, string $title, string $content, int $articleId): string
+    {
+        $subjectText = strtolower(trim((string) $subject));
+        $text = strtolower($title.' '.$content.' '.$subjectText);
+
+        $theme = 'general';
+
+        if (str_contains($subjectText, 'computer')) {
+            $theme = 'computer_science';
+        } elseif (str_contains($subjectText, 'mathematics') || str_contains($subjectText, 'math')) {
+            $theme = 'mathematics';
+        } elseif (str_contains($subjectText, 'civil')) {
+            $theme = 'civil_engineering';
+        } elseif (str_contains($subjectText, 'mechanical') && str_contains($subjectText, 'transportation')) {
+            $theme = 'transportation';
+        } elseif (str_contains($subjectText, 'mechanical')) {
+            $theme = 'mechanical_engineering';
+        }
+
+        if ($theme === 'general') {
+            if (preg_match('/\b(algorithm|software|database|network|ai|machine learning|code|programming|cyber)\b/i', $text)) {
+                $theme = 'computer_science';
+            } elseif (preg_match('/\b(calculus|algebra|geometry|equation|statistics|probability|theorem)\b/i', $text)) {
+                $theme = 'mathematics';
+            } elseif (preg_match('/\b(bridge|concrete|building|foundation|construction|structural|infrastructure)\b/i', $text)) {
+                $theme = 'civil_engineering';
+            } elseif (preg_match('/\b(engine|manufacturing|robot|gear|machine|thermodynamics)\b/i', $text)) {
+                $theme = 'mechanical_engineering';
+            } elseif (preg_match('/\b(transport|rail|vehicle|traffic|aerospace|logistics|ship|aviation)\b/i', $text)) {
+                $theme = 'transportation';
+            } elseif (preg_match('/\b(energy|solar|wind|carbon|climate|sustainability|environment)\b/i', $text)) {
+                $theme = 'energy_environment';
+            }
+        }
+
+        $seed = rawurlencode('eaplus-'.$theme.'-'.$articleId.'-'.substr(md5($title.'|'.$content), 0, 12));
+
+        return 'https://picsum.photos/seed/'.$seed.'/1200/800';
     }
 
     private function success(mixed $data = null, string $message = 'success', int $status = 200): JsonResponse
