@@ -201,4 +201,29 @@ class DashboardPageTest extends TestCase
             'id' => $plan->id,
         ]);
     }
+
+    public function test_dashboard_points_transactions_include_wordle_reward_entry(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->postJson(route('games.wordle.reward'), ['won' => true])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('awarded', true)
+            ->assertJsonPath('amount', 12);
+
+        $this->assertDatabaseHas('companion_transactions', [
+            'user_id' => $user->id,
+            'type' => 'earn',
+            'source' => 'wordle_complete',
+            'amount' => 12,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('home'))
+            ->assertOk()
+            ->assertSee('Wordle Complete')
+            ->assertSee('+12');
+    }
 }

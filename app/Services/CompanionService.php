@@ -175,8 +175,8 @@ class CompanionService
     {
         $userId = $user instanceof User ? $user->id : $user;
 
-        if ($item->type !== 'outfit') {
-            return ['success' => false, 'message' => 'Only outfits can be equipped.'];
+        if ($item->type !== 'outfit' && $item->type !== 'item') {
+            return ['success' => false, 'message' => 'Only outfits and badge items can be equipped.'];
         }
 
         $ownsItem = CompanionInventory::query()
@@ -185,7 +185,7 @@ class CompanionService
             ->exists();
 
         if (! $ownsItem) {
-            return ['success' => false, 'message' => 'Buy this outfit before equipping it.'];
+            return ['success' => false, 'message' => 'Buy this item before equipping it.'];
         }
 
         $profile = $this->ensureProfile($userId);
@@ -193,8 +193,28 @@ class CompanionService
 
         return [
             'success' => true,
-            'message' => 'Outfit equipped.',
+            'message' => 'Item equipped.',
             'equipped_item_id' => $item->id,
+        ];
+    }
+
+    public function unequipItem(User|int $user): array
+    {
+        $userId = $user instanceof User ? $user->id : $user;
+        $profile = $this->ensureProfile($userId);
+
+        if (! $profile->equipped_shop_item_id) {
+            return [
+                'success' => false,
+                'message' => 'No item is currently equipped.',
+            ];
+        }
+
+        $profile->forceFill(['equipped_shop_item_id' => null])->save();
+
+        return [
+            'success' => true,
+            'message' => 'Item removed.',
         ];
     }
 

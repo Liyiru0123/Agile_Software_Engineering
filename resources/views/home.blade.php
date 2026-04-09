@@ -37,6 +37,7 @@
             default => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><rect x="10" y="10" width="28" height="28" rx="10" fill="#FFFDF8" stroke="#8B6B47" stroke-width="3"/><path d="M16 24H32" stroke="#8B6B47" stroke-width="3" stroke-linecap="round"/><path d="M24 16V32" stroke="#D88C5A" stroke-width="3" stroke-linecap="round"/></svg>',
         };
     };
+    $ownedBadgesCollection = collect($ownedBadges ?? []);
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -47,44 +48,76 @@
     @endif
 
     <section class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 sm:p-8 shadow-sm">
-        <div class="grid gap-6 lg:grid-cols-1 lg:items-end">
-            <div class="max-w-3xl">
-                <div class="inline-flex items-center rounded-full bg-[#F3E7D8] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8B6B47]">
-                    Dashboard
-                </div>
-                <h1 class="mt-4 text-3xl sm:text-4xl font-black tracking-tight text-[#4A2C2A]">
-                    Plan the week, finish today, and keep the next task obvious.
-                </h1>
+        <div class="max-w-3xl">
+            <div class="inline-flex items-center rounded-full bg-[#F3E7D8] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8B6B47]">
+                Dashboard
+            </div>
+            <h1 class="mt-4 text-3xl sm:text-4xl font-black tracking-tight text-[#4A2C2A]">
+                Plan the week, finish today, and keep the next task obvious.
+            </h1>
+        </div>
 
+        <div class="mt-4 grid gap-3 xl:grid-cols-12">
+            <div class="xl:col-span-8 grid grid-cols-2 xl:grid-cols-4 gap-3">
+                <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">This Week</div>
+                        <div class="inline-flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-[#FBF6EF]">{!! $summaryIcon('week') !!}</div>
+                    </div>
+                    <div class="mt-2 text-2xl font-black leading-none text-[#4A2C2A]">{{ $weeklySummary['completion_rate'] }}%</div>
+                    <div class="mt-1 text-xs leading-4 text-[#8B6B47]">
+                        {{ $weeklySummary['completed'] }} / {{ $weeklySummary['total'] }} tasks<br>completed this week
+                    </div>
+                </article>
+
+                <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">This Month</div>
+                        <div class="inline-flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-[#FBF6EF]">{!! $summaryIcon('month') !!}</div>
+                    </div>
+                    <div class="mt-2 text-2xl font-black leading-none text-[#4A2C2A]">{{ $monthlySummary['completion_rate'] }}%</div>
+                    <div class="mt-1 text-xs leading-4 text-[#8B6B47]">
+                        {{ $monthlySummary['completed'] }} / {{ $monthlySummary['total'] }} tasks<br>completed this month
+                    </div>
+                </article>
+
+                <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Today</div>
+                        <div class="inline-flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-[#FBF6EF]">{!! $summaryIcon('today') !!}</div>
+                    </div>
+                    <div class="mt-2 text-2xl font-black leading-none text-[#4A2C2A]">{{ $todaySummary['pending'] }}</div>
+                    <div class="mt-1 text-xs leading-4 text-[#8B6B47]">
+                        {{ $todaySummary['completed'] }} done, {{ $todaySummary['skipped'] }} skipped<br>pending now
+                    </div>
+                </article>
+
+                <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Overdue</div>
+                        <div class="inline-flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-[#FBF6EF]">{!! $summaryIcon('overdue') !!}</div>
+                    </div>
+                    <div class="mt-2 text-2xl font-black leading-none text-[#4A2C2A]">{{ $overdueTasks->count() }}</div>
+                    <div class="mt-1 text-xs leading-4 text-[#8B6B47]">
+                        Pending tasks from<br>earlier dates
+                    </div>
+                </article>
             </div>
 
-        <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('week') !!}</div>
-                <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">This Week</div>
-                <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $weeklySummary['completion_rate'] }}%</div>
-                <div class="mt-1 text-sm text-[#8B6B47]">{{ $weeklySummary['completed'] }} of {{ $weeklySummary['total'] }} tasks completed</div>
-            </article>
+            <article class="xl:col-span-4 rounded-2xl border border-[#E8D9C7] bg-white/80 p-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">My Badges</div>
 
-            <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('month') !!}</div>
-                <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">This Month</div>
-                <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $monthlySummary['completion_rate'] }}%</div>
-                <div class="mt-1 text-sm text-[#8B6B47]">{{ $monthlySummary['completed'] }} of {{ $monthlySummary['total'] }} tasks completed</div>
-            </article>
-
-            <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('today') !!}</div>
-                <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Today</div>
-                <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $todaySummary['pending'] }}</div>
-                <div class="mt-1 text-sm text-[#8B6B47]">{{ $todaySummary['completed'] }} done, {{ $todaySummary['skipped'] }} skipped</div>
-            </article>
-
-            <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
-                <div class="inline-flex h-12 w-12 items-center justify-center rounded-[1rem] bg-[#FBF6EF]">{!! $summaryIcon('overdue') !!}</div>
-                <div class="text-xs font-semibold uppercase tracking-[0.14em] text-[#A58A6A]">Overdue</div>
-                <div class="mt-2 text-3xl font-black text-[#4A2C2A]">{{ $overdueTasks->count() }}</div>
-                <div class="mt-1 text-sm text-[#8B6B47]">Pending tasks from earlier dates</div>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    @forelse($ownedBadgesCollection->take(4) as $badge)
+                        <article class="rounded-xl px-3 py-2.5 bg-[#4A2C2A] text-[#F5E6D3]">
+                            <div class="text-sm font-bold leading-5">{{ $badge['name'] }}</div>
+                        </article>
+                    @empty
+                        <div class="col-span-2 rounded-xl bg-[#FBF4EA] px-3 py-3 text-xs leading-4 text-[#8B6B47]">
+                            No badges owned yet.<br>Buy badges from the shop.
+                        </div>
+                    @endforelse
+                </div>
             </article>
         </div>
     </section>

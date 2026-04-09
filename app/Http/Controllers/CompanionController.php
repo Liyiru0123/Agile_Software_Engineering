@@ -6,6 +6,7 @@ use App\Models\CompanionInventory;
 use App\Models\CompanionShopItem;
 use App\Models\CompanionTransaction;
 use App\Models\DailyAttendance;
+use App\Models\Submission;
 use App\Services\CompanionService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -94,6 +95,15 @@ class CompanionController extends Controller
     public function equip(CompanionShopItem $item): RedirectResponse
     {
         $result = $this->companionService->equipItem(request()->user(), $item);
+
+        return redirect()
+            ->route('shop.index')
+            ->with($result['success'] ? 'status' : 'error', $result['message']);
+    }
+
+    public function unequip(): RedirectResponse
+    {
+        $result = $this->companionService->unequipItem(request()->user());
 
         return redirect()
             ->route('shop.index')
@@ -247,6 +257,7 @@ class CompanionController extends Controller
             'shopItems' => $shopItems,
             'transactions' => $transactions,
             'attendanceSummary' => $this->buildAttendanceSummary($user),
+            'achievements' => $this->buildAchievements($user->id),
             'dailyRewardAmount' => self::DAILY_CHECKIN_REWARD,
         ];
     }
@@ -303,6 +314,81 @@ class CompanionController extends Controller
             'streak' => $this->calculateCheckInStreak($user->id),
             'next_missed_date' => $this->resolveLatestMissedDate($user->id)?->toDateString(),
             'makeup_card_quantity' => (int) ($makeupInventory?->quantity ?? 0),
+        ];
+    }
+
+    protected function buildAchievements(int $userId): array
+    {
+        $currentStreak = $this->calculateCheckInStreak($userId);
+
+        $hasAnyCheckIn = DailyAttendance::query()
+            ->where('user_id', $userId)
+            ->exists();
+
+        $listeningSubmissionCount = Submission::query()
+            ->join('exercises', 'submissions.exercise_id', '=', 'exercises.id')
+            ->where('submissions.user_id', $userId)
+            ->where('exercises.type', 'listening')
+            ->count();
+
+        $totalSubmissionCount = Submission::query()
+            ->where('user_id', $userId)
+            ->count();
+
+        $perfectListeningCompletedInTime = Submission::query()
+            ->join('exercises', 'submissions.exercise_id', '=', 'exercises.id')
+            ->where('submissions.user_id', $userId)
+            ->where('exercises.type', 'listening')
+            ->where('submissions.time_spent', '<=', 1200)
+            ->where(function ($query) {
+                $query->where('submissions.score', '>=', 99.99)
+                    ->orWhereBetween('submissions.score', [0.99, 1.01]);
+            })
+            ->exists();
+
+        return [
+            [
+                'key' => 'checkin_once',
+                'name' => 'One-Day Check-In',
+                'description' => 'Check in at least once.',
+                'unlocked' => $hasAnyCheckIn,
+            ],
+            [
+                'key' => 'checkin_streak_3',
+                'name' => '3-Day Momentum',
+                'description' => 'Check in for 3 consecutive days.',
+                'unlocked' => $currentStreak >= 3,
+            ],
+            [
+                'key' => 'checkin_streak_7',
+                'name' => '7-Day Check-In Streak',
+                'description' => 'Check in for 7 consecutive days.',
+                'unlocked' => $currentStreak >= 7,
+            ],
+            [
+                'key' => 'checkin_streak_30',
+                'name' => '30-Day Check-In Streak',
+                'description' => 'Check in for 30 consecutive days.',
+                'unlocked' => $currentStreak >= 30,
+            ],
+            [
+                'key' => 'listening_perfect_speed',
+                'name' => 'Speed Listener',
+                'description' => 'Complete one listening task within 20 minutes with 100% accuracy.',
+                'unlocked' => $perfectListeningCompletedInTime,
+            ],
+            [
+                'key' => 'listening_explorer_5',
+                'name' => 'Listening Explorer',
+                'description' => 'Complete 5 listening submissions.',
+                'unlocked' => $listeningSubmissionCount >= 5,
+            ],
+            [
+                'key' => 'practice_sessions_20',
+                'name' => 'Practice Grinder',
+                'description' => 'Complete 20 total practice submissions.',
+                'unlocked' => $totalSubmissionCount >= 20,
+            ],
         ];
     }
 

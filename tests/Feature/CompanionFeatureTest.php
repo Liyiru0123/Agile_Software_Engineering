@@ -20,7 +20,10 @@ class CompanionFeatureTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Shop')
-            ->assertSee('Badge Wall')
+            ->assertSee('Titles')
+            ->assertSee('One-Day Check-In')
+            ->assertSee('Speed Listener')
+            ->assertSee('7-Day Check-In Streak')
             ->assertSee('Makeup Check-In Card')
             ->assertSee('Sunset Ribbon');
     }
@@ -131,4 +134,35 @@ class CompanionFeatureTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    public function test_user_can_unequip_badge_style(): void
+    {
+        $user = User::factory()->create();
+        $badge = CompanionShopItem::query()->where('slug', 'storybook-badge')->firstOrFail();
+
+        \App\Models\CompanionProfile::query()->create([
+            'user_id' => $user->id,
+            'gold' => 0,
+            'total_gold_earned' => 0,
+            'equipped_shop_item_id' => $badge->id,
+        ]);
+
+        \App\Models\CompanionInventory::query()->create([
+            'user_id' => $user->id,
+            'shop_item_id' => $badge->id,
+            'quantity' => 1,
+            'purchased_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('shop.index'))
+            ->post(route('shop.unequip'))
+            ->assertRedirect(route('shop.index'));
+
+        $this->assertDatabaseHas('companion_profiles', [
+            'user_id' => $user->id,
+            'equipped_shop_item_id' => null,
+        ]);
+    }
 }
+
