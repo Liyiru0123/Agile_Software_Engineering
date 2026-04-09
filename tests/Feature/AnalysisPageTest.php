@@ -18,6 +18,7 @@ class AnalysisPageTest extends TestCase
             ->get(route('study.analysis'))
             ->assertOk()
             ->assertSee('Learning Analysis')
-            ->assertSee('Listening Weak Spots');
+            ->assertSee('Listening Weak Spots')
+            ->assertSee('Speaking Weak Spots');
     }
 }

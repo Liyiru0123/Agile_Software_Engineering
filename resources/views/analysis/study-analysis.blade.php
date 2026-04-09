@@ -6,9 +6,9 @@
 @php
     $timeRange = request('range', '7d');
     $listeningCompleted = (int) ($capabilityDiagnosis['listening']['completed_count'] ?? 0);
-    $readingCompleted = (int) ($capabilityDiagnosis['reading']['completed_count'] ?? 0);
+    $speakingCompleted = (int) ($capabilityDiagnosis['speaking']['completed_count'] ?? 0);
     $listeningErrorRate = (float) ($capabilityDiagnosis['listening']['error_rate'] ?? 0);
-    $readingErrorRate = (float) ($capabilityDiagnosis['reading']['error_rate'] ?? 0);
+    $speakingErrorRate = (float) ($capabilityDiagnosis['speaking']['error_rate'] ?? 0);
     $topIssues = collect($capabilityDiagnosis['top_issues'] ?? [])->take(3)->values();
 @endphp
 
@@ -94,12 +94,12 @@
                 <div class="rounded-[1.5rem] bg-[#FFF8F0] p-4">
                     <div class="flex items-center justify-between">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-[#A58A6A]">Practice Mix</p>
-                        <p class="text-sm font-semibold text-[#6B4E3A]">{{ $listeningCompleted + $readingCompleted }}</p>
+                        <p class="text-sm font-semibold text-[#6B4E3A]">{{ $listeningCompleted + $speakingCompleted }}</p>
                     </div>
                     <div class="mt-3 h-36"><canvas id="skill-mix-chart"></canvas></div>
                     <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-[#6B4E3A]">
                         <span class="rounded-full bg-white px-3 py-1">Listening {{ $listeningCompleted }}</span>
-                        <span class="rounded-full bg-white px-3 py-1">Reading {{ $readingCompleted }}</span>
+                        <span class="rounded-full bg-white px-3 py-1">Speaking {{ $speakingCompleted }}</span>
                     </div>
                 </div>
             </div>
@@ -206,9 +206,9 @@
         <article class="xl:col-span-5 rounded-[2rem] border border-[#E7D8C5] bg-white p-5 shadow-sm sm:p-6">
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-black text-[#4A2C2A]">Skill Comparison</h2>
-                <span class="text-sm font-semibold text-[#8B6B47]">Listening vs Reading</span>
+                <span class="text-sm font-semibold text-[#8B6B47]">Listening vs Speaking</span>
             </div>
-            <div class="mt-4 h-72"><canvas id="listening-reading-chart"></canvas></div>
+            <div class="mt-4 h-72"><canvas id="listening-speaking-chart"></canvas></div>
         </article>
     </section>
 
@@ -223,10 +223,10 @@
 
         <article class="rounded-[2rem] border border-[#E7D8C5] bg-white p-5 shadow-sm sm:p-6">
             <div class="flex items-center justify-between">
-                <h2 class="text-lg font-black text-[#4A2C2A]">Reading Weak Spots</h2>
-                <span class="text-sm font-semibold text-[#8B6B47]">{{ $readingErrorRate }}% error</span>
+                <h2 class="text-lg font-black text-[#4A2C2A]">Speaking Weak Spots</h2>
+                <span class="text-sm font-semibold text-[#8B6B47]">{{ $speakingErrorRate }}% error</span>
             </div>
-            <div class="mt-4 h-72"><canvas id="reading-errors-chart"></canvas></div>
+            <div class="mt-4 h-72"><canvas id="speaking-errors-chart"></canvas></div>
         </article>
     </section>
 </div>
@@ -448,10 +448,10 @@
 
             buildDoughnut(
                 'skill-mix-chart',
-                ['Listening', 'Reading'],
+                ['Listening', 'Speaking'],
                 [
                     capabilityDiagnosis.listening?.completed_count || 0,
-                    capabilityDiagnosis.reading?.completed_count || 0,
+                    capabilityDiagnosis.speaking?.completed_count || 0,
                 ],
                 [palette.cocoa, palette.gold]
             );
@@ -511,7 +511,7 @@
             );
 
             buildLine(
-                'listening-reading-chart',
+                'listening-speaking-chart',
                 shortLabels(outcomes.listening_accuracy_trend || []),
                 [
                     {
@@ -524,8 +524,8 @@
                         pointBackgroundColor: palette.cocoa,
                     },
                     {
-                        label: 'Reading',
-                        data: (outcomes.reading_accuracy_trend || []).map(item => item.accuracy),
+                        label: 'Speaking',
+                        data: (outcomes.speaking_accuracy_trend || []).map(item => item.accuracy),
                         borderColor: palette.gold,
                         backgroundColor: 'rgba(201, 169, 97, 0.10)',
                         tension: 0.35,
@@ -544,9 +544,9 @@
             );
 
             buildDoughnut(
-                'reading-errors-chart',
-                (capabilityDiagnosis.reading?.error_type_distribution || []).map(item => item.type),
-                (capabilityDiagnosis.reading?.error_type_distribution || []).map(item => item.count),
+                'speaking-errors-chart',
+                (capabilityDiagnosis.speaking?.error_type_distribution || []).map(item => item.type),
+                (capabilityDiagnosis.speaking?.error_type_distribution || []).map(item => item.count),
                 [palette.gold, palette.ink, palette.peach, palette.mint, palette.rose]
             );
         })();
