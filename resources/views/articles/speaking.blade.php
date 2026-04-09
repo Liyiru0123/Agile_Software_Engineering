@@ -118,9 +118,9 @@
                         <span id="practice-mode-badge" class="px-3 py-1 rounded-full bg-white/10 text-[#F5E6D3] text-xs font-semibold">Open response</span>
                     </div>
                     <p id="practice-mode-description" class="text-sm text-[#F5E6D3]/80 leading-6 mb-5">{{ $hasRecordableTask ? 'Select a task above, then record your response.' : 'This article does not have a recordable speaking task yet.' }}</p>
-                    <div id="selected-task-indicator" class="mb-4 hidden">
-                        <span class="text-xs font-semibold uppercase text-[#C9A961]">Selected:</span>
-                        <div id="selected-task-title" class="text-sm font-medium mt-1"></div>
+                    <div id="selected-task-indicator" class="mb-4 hidden rounded-2xl border-2 border-[#C9A961] bg-[#FFF4D8] px-4 py-3 shadow-[0_0_0_2px_rgba(201,169,97,0.2)]">
+                        <div class="text-[11px] font-black uppercase tracking-[0.16em] text-[#5A3527]">Now Selected</div>
+                        <div id="selected-task-title" class="mt-1 text-base font-extrabold text-[#4A2C2A]"></div>
                     </div>
                     <div id="selected-target-box" class="hidden rounded-2xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-[#F5E6D3] leading-6 mb-4"></div>
                     <div class="flex flex-col gap-3">
@@ -258,15 +258,14 @@ function findClip(clipId) {
     return shadowingClips.find((clip) => clip.id === clipId) || null;
 }
 
-function setRecorderContext(title, mode, targetText = '') {
+function setRecorderContext(title, mode) {
     selectedTaskTitle.textContent = title;
     selectedTaskIndicator.classList.remove('hidden');
 
     if (mode === 'shadowing') {
         practiceModeBadge.textContent = 'Shadowing';
-        practiceModeDescription.textContent = 'Repeat the short clip as closely as you can. Scoring focuses on accuracy, fluency, and pronunciation.';
-        selectedTargetBox.textContent = targetText;
-        selectedTargetBox.classList.toggle('hidden', !targetText);
+        practiceModeDescription.textContent = `Selected paragraph: ${title}. Repeat the short clip as closely as you can while reading the target transcript on the left panel. Scoring focuses on accuracy, fluency, and pronunciation.`;
+        selectedTargetBox.classList.add('hidden');
     } else {
         practiceModeBadge.textContent = 'Open response';
         practiceModeDescription.textContent = 'Give a longer spoken response to the selected prompt. Scoring focuses on relevance, fluency, and pronunciation.';
@@ -342,7 +341,7 @@ function selectShadowingClip(element) {
 
     selectedClipId = clip.id;
     activePracticeMode = 'shadowing';
-    setRecorderContext(clip.title, 'shadowing', clip.transcript);
+    setRecorderContext(clip.title, 'shadowing');
     highlightSelection();
     resetRecorderUI();
     hideSubmissionMessage();
