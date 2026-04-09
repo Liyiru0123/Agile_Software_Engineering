@@ -17,7 +17,10 @@ use App\Http\Controllers\SelectionTranslationController;
 use App\Http\Controllers\SpeakingVideoCallController;
 use App\Http\Controllers\WritingTrainingController;
 use App\Models\Article;
+use App\Models\CompanionInventory;
+use App\Models\CompanionShopItem;
 use App\Models\Conversation;
+use App\Models\DailyAttendance;
 use App\Models\FriendRequest;
 use App\Models\ForumPost;
 use App\Models\ReadingHistory;
@@ -138,6 +141,81 @@ Route::get('/', function (Request $request) {
         'skipped' => $todayTasks->where('status', 'skipped')->count(),
     ];
 
+
+    $attendanceRecords = DailyAttendance::query()
+        ->where('user_id', $user->id)
+        ->whereBetween('attendance_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+        ->get()
+        ->keyBy(fn (DailyAttendance $record) => $record->attendance_date->toDateString());
+
+    $calendarCheckins = collect();
+    $cursor = $monthStart->copy();
+
+    while ($cursor->lte($monthEnd)) {
+        $dateString = $cursor->toDateString();
+        $record = $attendanceRecords->get($dateString);
+        $status = 'upcoming';
+
+        if ($record) {
+            $status = $record->source === 'makeup' ? 'makeup' : 'claimed';
+        } elseif ($cursor->lt($today)) {
+            $status = 'missed';
+        } elseif ($cursor->isSameDay($today)) {
+            $status = 'today';
+        }
+
+        $calendarCheckins->put($dateString, [
+            'status' => $status,
+            'source' => $record?->source,
+        ]);
+
+        $cursor->addDay();
+    }
+
+    $makeupCard = CompanionShopItem::query()->where('benefit_key', 'makeup_checkin')->first();
+    $makeupInventory = $makeupCard
+        ? CompanionInventory::query()
+            ->where('user_id', $user->id)
+            ->where('shop_item_id', $makeupCard->id)
+            ->first()
+        : null;
+
+    $checkinMonthStart = $today->copy()->startOfMonth();
+    $nextMissedDate = null;
+    if (! $today->isSameDay($checkinMonthStart)) {
+        $claimedDates = DailyAttendance::query()
+            ->where('user_id', $user->id)
+            ->whereBetween('attendance_date', [$checkinMonthStart->toDateString(), $today->copy()->subDay()->toDateString()])
+            ->pluck('attendance_date')
+            ->map(fn ($date) => \Carbon\Carbon::parse($date)->toDateString())
+            ->all();
+
+        $missedCursor = $today->copy()->subDay();
+        while ($missedCursor->gte($checkinMonthStart)) {
+            if (! in_array($missedCursor->toDateString(), $claimedDates, true)) {
+                $nextMissedDate = $missedCursor->toDateString();
+                break;
+            }
+
+            $missedCursor->subDay();
+        }
+    }
+
+    $todayClaimed = DailyAttendance::query()
+        ->where('user_id', $user->id)
+        ->whereDate('attendance_date', $today)
+        ->exists();
+
+    $checkinSummary = [
+        'daily_reward_amount' => 25,
+        'today_claimed' => $todayClaimed,
+        'makeup_card_quantity' => (int) ($makeupInventory?->quantity ?? 0),
+        'next_missed_date' => $nextMissedDate,
+        'claimed_count' => $attendanceRecords->count(),
+        'makeup_count' => $attendanceRecords->where('source', 'makeup')->count(),
+        'missed_count' => $calendarCheckins->where('status', 'missed')->count(),
+    ];
+
     $favoritePlanArticles = Article::query()
         ->join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
         ->where('user_favorites.user_id', $user->id)
@@ -245,6 +323,8 @@ Route::get('/', function (Request $request) {
         'selectedDate',
         'currentMonth',
         'calendarPlans',
+        'calendarCheckins',
+        'checkinSummary',
         'selectedTasks',
         'overdueTasks',
         'weeklySummary',

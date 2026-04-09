@@ -2,69 +2,11 @@
 
 @section('title', 'Speaking Hub')
 
-@push('styles')
-<style>
-    .speaking-chip-row > span > span:first-child {
-        color: transparent;
-        font-size: 0;
-        position: relative;
-    }
-
-    .speaking-chip-row > span > span:first-child::after {
-        content: '';
-        display: block;
-        width: 1rem;
-        height: 1rem;
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: contain;
-    }
-
-    .speaking-chip-row > span:nth-child(1) > span:first-child::after {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 8H20' stroke='%23C95F43' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M7 12H17' stroke='%23C95F43' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M10 16H14' stroke='%23C95F43' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
-    }
-
-    .speaking-chip-row > span:nth-child(2) > span:first-child::after {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 12L10 16L18 8' stroke='%23C9A961' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    }
-</style>
-@endpush
-
 @section('content')
 <div class="min-h-screen bg-[#F6F0E8] py-10">
-    <div class="max-w-6xl mx-auto px-6">
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-            <div class="bg-white rounded-3xl border border-[#E0D2C2] shadow-sm p-8">
-                <div class="flex flex-wrap items-center gap-3 mb-4">
-                    <span class="px-3 py-1 rounded-full bg-[#6B3D2E]/10 text-[#6B3D2E] text-xs font-semibold">Speaking Hub</span>
-                    <span class="px-3 py-1 rounded-full bg-[#F3E7D8] text-[#6B3D2E] text-xs font-semibold">Choose a mode</span>
-                </div>
-
-                <h1 class="text-3xl font-bold text-[#4A2C2A] mb-3">Speaking</h1>
-                <p class="text-[#6B3D2E] leading-7 max-w-3xl">
-                    Choose the speaking mode you want to use. You can continue with article-based speaking practice, talk with the Live2D AI companion, or enter the video call room.
-                </p>
-
-                <div class="speaking-chip-row mt-6 flex flex-wrap gap-3 text-sm text-[#8B6B47]">
-                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FBE4DB]">●</span>Practice by mode</span>
-                    <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3CF]">◌</span>Clear visual choices</span>
-                </div>
-            </div>
-
-            <div class="rounded-3xl border border-[#E0D2C2] bg-[linear-gradient(180deg,#FFF8F0_0%,#F3E4D8_100%)] p-5 shadow-sm">
-                <svg class="w-full" viewBox="0 0 260 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="132" cy="88" r="58" fill="#F3E7D8"/>
-                    <rect x="48" y="134" width="164" height="46" rx="23" fill="#4A2C2A"/>
-                    <rect x="88" y="64" width="88" height="68" rx="26" fill="#FFFDF8" stroke="#D8C3A6" stroke-width="3"/>
-                    <rect x="120" y="38" width="24" height="32" rx="12" fill="#D88C5A"/>
-                    <rect x="106" y="118" width="52" height="38" rx="19" fill="#FFF3CF"/>
-                    <path d="M132 84V116" stroke="#6B3D2E" stroke-width="8" stroke-linecap="round"/>
-                    <path d="M117 96H147" stroke="#6B3D2E" stroke-width="8" stroke-linecap="round"/>
-                </svg>
-                <div class="mt-3 text-sm leading-6 text-[#6B3D2E]">
-                    Start with the picture, then choose the mode. The page should explain itself before the user reads everything.
-                </div>
-            </div>
+    <div class="max-w-[1440px] mx-auto px-5 md:px-8 xl:px-12">
+        <div class="mb-8">
+            <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">Speaking Hub</h1>
         </div>
 
         <div class="mt-8 grid lg:grid-cols-2 gap-6">
