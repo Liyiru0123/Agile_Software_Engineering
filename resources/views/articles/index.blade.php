@@ -31,18 +31,24 @@
 @endpush
 
 @section('content')
-<div class="max-w-[1440px] mx-auto px-5 md:px-8 xl:px-12">
+<div class="max-w-[1440px] mx-auto px-5 md:px-8 xl:px-12 pt-4">
     @php
         $skill = $skill ?? request('skill');
         $currentSkill = in_array($skill, ['listening', 'speaking'], true) ? $skill : 'listening';
-        $pageHeading = $currentSkill === 'speaking' ? 'Speaking' : 'Listening Hub';
+        $pageHeading = $currentSkill === 'speaking' ? 'Article Speaking Learning' : 'Listening Hub';
         $pageSubheading = $currentSkill === 'speaking'
             ? 'Browse speaking-ready articles and practice prompts'
             : 'Browse listening-ready articles and transcript tasks';
     @endphp
 
     <div class="mb-8">
-        <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">{{ $pageHeading }}</h1>
+        <div class="flex items-center justify-between gap-4">
+            <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">Article Speaking Learning</h1>
+            <a href="{{ route('speaking.hub') }}"
+               class="inline-flex items-center rounded-xl border border-[#D8C3A6] bg-[#FFF8F0] px-4 py-2 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
+                Back to Speaking Hub
+            </a>
+        </div>
     </div>
 
     <div class="space-y-6">
