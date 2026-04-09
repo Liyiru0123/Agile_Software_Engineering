@@ -47,7 +47,7 @@
     @endif
 
     <section class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 sm:p-8 shadow-sm">
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+        <div class="grid gap-6 lg:grid-cols-1 lg:items-end">
             <div class="max-w-3xl">
                 <div class="inline-flex items-center rounded-full bg-[#F3E7D8] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8B6B47]">
                     Dashboard
@@ -55,9 +55,6 @@
                 <h1 class="mt-4 text-3xl sm:text-4xl font-black tracking-tight text-[#4A2C2A]">
                     Plan the week, finish today, and keep the next task obvious.
                 </h1>
-                <p class="mt-3 text-sm sm:text-base leading-7 text-[#8B6B47]">
-                    This page now focuses on execution first: weekly and monthly completion, the selected day's tasks, and a quick way to create new plans.
-                </p>
                 <div class="mt-5 flex flex-wrap gap-3 text-sm text-[#8B6B47]">
                     <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2">
                         <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FBE4DB]">
@@ -79,40 +76,7 @@
                     </span>
                 </div>
 
-                <div class="mt-6 flex flex-wrap gap-3">
-                    <a href="{{ route('favorites.plan') }}"
-                       class="inline-flex items-center justify-center rounded-xl bg-[#4A2C2A] px-4 py-3 text-sm font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
-                        Plan From Favorites
-                    </a>
-                    <a href="{{ route('study.analysis') }}"
-                       class="inline-flex items-center justify-center rounded-xl border border-[#C9A961] px-4 py-3 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
-                        View Analysis
-                    </a>
-                    <a href="{{ route('articles.index') }}"
-                       class="inline-flex items-center justify-center rounded-xl border border-[#C9A961] px-4 py-3 text-sm font-semibold text-[#6B3D2E] hover:bg-[#F9EFE2] transition">
-                        Browse Articles
-                    </a>
-                </div>
             </div>
-
-            <div class="rounded-[2rem] border border-[#E8D9C7] bg-[linear-gradient(180deg,#FFF8F0_0%,#F3E4D8_100%)] p-5">
-                <svg class="w-full" viewBox="0 0 280 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="28" y="34" width="224" height="136" rx="24" fill="#FFFDF8" stroke="#D8C3A6" stroke-width="3"/>
-                    <rect x="48" y="56" width="72" height="84" rx="16" fill="#FBE4DB"/>
-                    <path d="M64 80H102" stroke="#C95F43" stroke-width="6" stroke-linecap="round"/>
-                    <path d="M64 98H96" stroke="#D88C5A" stroke-width="6" stroke-linecap="round"/>
-                    <rect x="138" y="54" width="92" height="18" rx="9" fill="#FFF3CF"/>
-                    <rect x="138" y="84" width="70" height="14" rx="7" fill="#E8D6C7"/>
-                    <rect x="138" y="108" width="54" height="14" rx="7" fill="#F3E7D8"/>
-                    <circle cx="214" cy="118" r="20" fill="#FFF3CF" stroke="#C9A961" stroke-width="3"/>
-                    <path d="M214 107V118L222 123" stroke="#6B3D2E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                    <rect x="84" y="170" width="112" height="16" rx="8" fill="#4A2C2A"/>
-                </svg>
-                <div class="mt-3 text-sm leading-6 text-[#6B3D2E]">
-                    The main actions are now paired with a simple scene so the page reads faster before users scan the text.
-                </div>
-            </div>
-        </div>
 
         <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <article class="rounded-2xl border border-[#E8D9C7] bg-white/80 p-4">
@@ -384,7 +348,6 @@
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <h2 class="text-xl font-black text-[#4A2C2A]">Quick Add Plan</h2>
-                        <p class="mt-1 text-sm text-[#8B6B47]">Use training targets first, then add article-specific or custom tasks only when needed.</p>
                     </div>
                     <a href="{{ route('favorites.plan') }}"
                        class="text-xs font-semibold text-[#6B3D2E] hover:text-[#4A2C2A]">
@@ -508,7 +471,6 @@
             @if($overdueTasks->count() > 0)
                 <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-5 sm:p-6 shadow-sm">
                     <h2 class="text-xl font-black text-[#4A2C2A]">Overdue Tasks</h2>
-                    <p class="mt-1 text-sm text-[#8B6B47]">These still need attention from earlier dates.</p>
 
                     <div class="mt-4 space-y-3">
                         @foreach($overdueTasks as $task)
@@ -527,47 +489,33 @@
     </section>
 
     <section class="space-y-4">
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-end">
+        <div class="grid gap-4 lg:grid-cols-1 lg:items-end">
             <div>
                 <h2 class="text-2xl font-black text-[#4A2C2A]">Support Tools</h2>
-                <p class="mt-1 text-sm text-[#8B6B47]">Useful resources stay available, but they no longer compete with your daily plan.</p>
             </div>
-            <div class="rounded-[1.75rem] border border-[#E6D3BC] bg-[linear-gradient(180deg,#FFF8F0_0%,#F3E4D8_100%)] p-4">
-                <svg class="w-full" viewBox="0 0 220 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="16" y="66" width="46" height="28" rx="14" fill="#FBE4DB"/>
-                    <rect x="74" y="50" width="46" height="44" rx="16" fill="#FFF3CF"/>
-                    <rect x="132" y="34" width="46" height="60" rx="16" fill="#E8D6C7"/>
-                    <rect x="190" y="18" width="14" height="76" rx="7" fill="#6B3D2E"/>
-                    <path d="M12 98H208" stroke="#4A2C2A" stroke-width="6" stroke-linecap="round"/>
-                </svg>
-            </div>
+
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-            <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('favorites') !!}</div>
-                        <h3 class="text-lg font-black text-[#4A2C2A]">Favorites</h3>
-                    </div>
-                    <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $favoritesSummary['total'] }}</span>
+            <article class="flex h-full flex-col rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('favorites') !!}</div>
+                    <h3 class="text-lg font-black text-[#4A2C2A]">Favorites</h3>
                 </div>
 
-                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Keep your best articles together, then turn them into study plans without searching again.</p>
-
-                <div class="mt-4 space-y-2">
+                <div class="mt-5 min-h-[8.5rem] space-y-2">
                     @forelse($favoritesSummary['recent'] as $article)
                         <div class="rounded-xl bg-white/80 px-3 py-2 text-sm text-[#6B3D2E] truncate">
                             {{ $article->title }}
                         </div>
                     @empty
-                        <div class="rounded-xl border border-dashed border-[#D8C3A6] bg-white/60 px-3 py-4 text-sm text-[#8B6B47]">
+                        <div class="flex min-h-[8.5rem] items-center rounded-xl border border-dashed border-[#D8C3A6] bg-white/60 px-3 py-4 text-sm text-[#8B6B47]">
                             No favorites yet.
                         </div>
                     @endforelse
                 </div>
 
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="mt-auto pt-4 flex flex-wrap gap-2">
                     <a href="{{ route('favorites.index') }}"
                        class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
                         Open Favorites
@@ -579,31 +527,26 @@
                 </div>
             </article>
 
-            <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('history') !!}</div>
-                        <h3 class="text-lg font-black text-[#4A2C2A]">Reading History</h3>
-                    </div>
-                    <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $historySummary['active_days_7d'] }} active days</span>
+            <article class="flex h-full flex-col rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('history') !!}</div>
+                    <h3 class="text-lg font-black text-[#4A2C2A]">Reading History</h3>
                 </div>
 
-                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Resume from the last article you touched instead of guessing where to restart.</p>
-
-                <div class="mt-4 space-y-2">
+                <div class="mt-5 min-h-[8.5rem] space-y-2">
                     @forelse($historySummary['recent'] as $item)
                         <div class="rounded-xl bg-white/80 px-3 py-3">
                             <div class="text-sm font-semibold text-[#4A2C2A] truncate">{{ $item['title'] }}</div>
                             <div class="mt-1 text-xs text-[#8B6B47]">{{ $item['last_viewed_at'] ?? 'Recently viewed' }}</div>
                         </div>
                     @empty
-                        <div class="rounded-xl border border-dashed border-[#D8C3A6] bg-white/60 px-3 py-4 text-sm text-[#8B6B47]">
+                        <div class="flex min-h-[8.5rem] items-center rounded-xl border border-dashed border-[#D8C3A6] bg-white/60 px-3 py-4 text-sm text-[#8B6B47]">
                             No reading history yet.
                         </div>
                     @endforelse
                 </div>
 
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="mt-auto pt-4 flex flex-wrap gap-2">
                     <a href="{{ $historySummary['continue_url'] }}"
                        class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
                         Continue Reading
@@ -615,31 +558,26 @@
                 </div>
             </article>
 
-            <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('notebook') !!}</div>
-                        <h3 class="text-lg font-black text-[#4A2C2A]">Notebook</h3>
-                    </div>
-                    <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $notebookSummary['review_pending'] }} saved</span>
+            <article class="flex h-full flex-col rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('notebook') !!}</div>
+                    <h3 class="text-lg font-black text-[#4A2C2A]">Notebook</h3>
                 </div>
 
-                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Capture useful phrases and example sentences, then come back when it is review time.</p>
-
-                <div class="mt-4 space-y-2">
+                <div class="mt-5 min-h-[8.5rem] space-y-2">
                     @forelse($notebookSummary['recent'] as $item)
                         <div class="rounded-xl bg-white/80 px-3 py-3">
                             <div class="text-sm text-[#4A2C2A] truncate">{{ $item['text'] }}</div>
                             <div class="mt-1 text-xs text-[#8B6B47] truncate">{{ $item['article_title'] }}</div>
                         </div>
                     @empty
-                        <div class="rounded-xl border border-dashed border-[#D8C3A6] bg-white/60 px-3 py-4 text-sm text-[#8B6B47]">
+                        <div class="flex min-h-[8.5rem] items-center rounded-xl border border-dashed border-[#D8C3A6] bg-white/60 px-3 py-4 text-sm text-[#8B6B47]">
                             No notebook entries yet.
                         </div>
                     @endforelse
                 </div>
 
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="mt-auto pt-4 flex flex-wrap gap-2">
                     <a href="{{ route('notebook.review') }}"
                        class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
                         Start Review
@@ -651,20 +589,43 @@
                 </div>
             </article>
 
-            <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('analysis') !!}</div>
-                        <h3 class="text-lg font-black text-[#4A2C2A]">Analysis</h3>
+            <article class="flex h-full flex-col rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('analysis') !!}</div>
+                    <h3 class="text-lg font-black text-[#4A2C2A]">Analysis</h3>
+                </div>
+
+                <div class="mt-5 min-h-[8.5rem] rounded-[1.5rem] bg-white/80 px-3 py-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="rounded-xl bg-[#FFF8F0] px-2.5 py-2.5">
+                            <div class="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">7D Hours</div>
+                            <div class="mt-1 text-xl font-black text-[#4A2C2A]">{{ number_format($analysisSummary['study_hours_7d'] ?? 0, 1) }}</div>
+                        </div>
+                        <div class="rounded-xl bg-[#FFF8F0] px-2.5 py-2.5">
+                            <div class="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">Accuracy</div>
+                            <div class="mt-1 text-xl font-black text-[#4A2C2A]">{{ number_format($analysisSummary['accuracy_7d'] ?? 0, 1) }}%</div>
+                        </div>
+                        <div class="rounded-xl bg-[#FFF8F0] px-2.5 py-2.5">
+                            <div class="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">Listening</div>
+                            <div class="mt-1 text-xl font-black text-[#4A2C2A]">{{ $analysisSummary['listening_count_7d'] ?? 0 }}</div>
+                        </div>
+                        <div class="rounded-xl bg-[#FFF8F0] px-2.5 py-2.5">
+                            <div class="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">Speaking</div>
+                            <div class="mt-1 text-xl font-black text-[#4A2C2A]">{{ $analysisSummary['speaking_count_7d'] ?? 0 }}</div>
+                        </div>
                     </div>
-                    <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">Insights</span>
+                    <div class="mt-3">
+                        <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.08em] text-[#A58A6A]">
+                            <span>Plan Completion</span>
+                            <span>{{ $analysisSummary['plan_completion_rate'] ?? 0 }}%</span>
+                        </div>
+                        <div class="mt-1.5 h-2 rounded-full bg-[#EFE2D3]">
+                            <div class="h-2 rounded-full bg-[#4A2C2A]" style="width: {{ $analysisSummary['plan_completion_rate'] ?? 0 }}%"></div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="mt-4 space-y-2 text-sm leading-7 text-[#6B3D2E]">
-                    <p>Review your study effort, outcomes, and weak-skill diagnosis in one place.</p>
-                </div>
-
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="mt-auto pt-4 flex flex-wrap gap-2">
                     <a href="{{ route('study.analysis') }}"
                        class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
                         Open Analysis
@@ -672,23 +633,18 @@
                 </div>
             </article>
 
-            <article class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('community') !!}</div>
-                        <h3 class="text-lg font-black text-[#4A2C2A]">Community</h3>
-                    </div>
-                    <span class="rounded-full bg-[#F3E7D8] px-3 py-1 text-xs font-bold text-[#6B3D2E]">{{ $communitySummary['my_posts_count'] }} posts</span>
+            <article class="flex h-full flex-col rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-[#FBF6EF]">{!! $toolIcon('community') !!}</div>
+                    <h3 class="text-lg font-black text-[#4A2C2A]">Community</h3>
                 </div>
 
-                <p class="mt-4 text-sm leading-7 text-[#6B3D2E]">Track your posts and saved discussions without digging through the forum first.</p>
-
-                <div class="mt-4 space-y-2 text-sm text-[#6B3D2E]">
+                <div class="mt-5 min-h-[8.5rem] space-y-2 text-sm text-[#6B3D2E]">
                     <div class="rounded-xl bg-white/80 px-3 py-3">My posts: {{ $communitySummary['my_posts_count'] }}</div>
                     <div class="rounded-xl bg-white/80 px-3 py-3">Saved posts: {{ $communitySummary['saved_posts_count'] }}</div>
                 </div>
 
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="mt-auto pt-4 flex flex-wrap gap-2">
                     <a href="{{ route('forum.my') }}"
                        class="inline-flex items-center rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] hover:bg-[#6B3D2E] transition">
                         My Forum

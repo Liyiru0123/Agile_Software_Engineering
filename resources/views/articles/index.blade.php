@@ -50,30 +50,8 @@
         ];
     @endphp
 
-    <div class="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div class="rounded-[2rem] border border-[#D8C3A6] bg-[#FFF8F0] p-6 shadow-sm">
-            <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">{{ $pageHeading }}</h1>
-            <p class="text-[#6B3D2E] mt-2">{{ $pageSubheading }}</p>
-            <div class="articles-chip-row mt-5 flex flex-wrap gap-3 text-sm text-[#8B6B47]">
-                <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FBE4DB]">●</span>Filter by progress</span>
-                <span class="inline-flex items-center gap-2 rounded-full bg-[#FBF6EF] px-3 py-2"><span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF3CF]">◌</span>Preview each article</span>
-            </div>
-        </div>
-
-        <div class="overflow-hidden rounded-[2rem] border border-[#D8C3A6] bg-[#FFF8F0] shadow-sm">
-            <img
-                src="{{ $heroImage }}"
-                alt="Quiet library reading room"
-                class="h-52 w-full object-cover"
-                loading="eager"
-                referrerpolicy="no-referrer"
-            >
-            <div class="mt-3 text-sm leading-6 text-[#6B3D2E]">
-                <div class="px-5 pb-5 pt-4">
-                    Use the filters first, then open the card that matches your level and current study goal.
-                </div>
-            </div>
-        </div>
+    <div class="mb-8">
+        <h1 class="text-3xl font-serif font-bold text-[#4A2C2A]">{{ $pageHeading }}</h1>
     </div>
 
     <div class="space-y-6">

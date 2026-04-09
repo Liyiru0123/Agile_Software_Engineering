@@ -226,6 +226,21 @@ Route::get('/', function (Request $request) {
             ->count(),
         'saved_posts_count' => $user->favoritedForumPosts()->count(),
     ];
+
+    $analysisSubmissions7d = Submission::query()
+        ->join('exercises', 'submissions.exercise_id', '=', 'exercises.id')
+        ->where('submissions.user_id', $user->id)
+        ->where('submissions.created_at', '>=', now()->subDays(6)->startOfDay())
+        ->select('submissions.score', 'submissions.time_spent', 'exercises.type')
+        ->get();
+
+    $analysisSummary = [
+        'study_hours_7d' => round(((int) $analysisSubmissions7d->sum('time_spent')) / 3600, 1),
+        'accuracy_7d' => round(($analysisSubmissions7d->avg('score') ?? 0) * (($analysisSubmissions7d->avg('score') ?? 0) <= 1 ? 100 : 1), 1),
+        'listening_count_7d' => $analysisSubmissions7d->where('type', 'listening')->count(),
+        'speaking_count_7d' => $analysisSubmissions7d->filter(fn ($row) => in_array($row->type, ['speaking', 'reading'], true))->count(),
+        'plan_completion_rate' => $weeklySummary['completion_rate'],
+    ];
     return view('home', compact(
         'selectedDate',
         'currentMonth',
@@ -243,6 +258,7 @@ Route::get('/', function (Request $request) {
         'notebookSummary',
         'favoritesSummary',
         'communitySummary',
+        'analysisSummary',
         'today',
         'monthStart',
         'monthEnd'

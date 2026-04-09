@@ -231,10 +231,10 @@ class AnalysisController extends Controller
             ];
         })->values();
 
-        $readingTrend = collect($dateLabels)->map(function (string $date) use ($submissions) {
+        $speakingTrend = collect($dateLabels)->map(function (string $date) use ($submissions) {
             $daySubmissions = $submissions
                 ->filter(fn ($s) => Carbon::parse($s->created_at)->toDateString() === $date)
-                ->filter(fn ($s) => $s->exercise?->type === 'reading');
+                ->filter(fn ($s) => in_array($s->exercise?->type, ['speaking', 'reading'], true));
 
             return [
                 'date' => $date,
@@ -248,17 +248,17 @@ class AnalysisController extends Controller
         $efficiencyIndex = round(($completedExercises / $totalStudyHours) * ($overallAccuracy / 100), 2);
 
         $listeningOverall = $this->toPercent((float) $submissions->filter(fn ($s) => $s->exercise?->type === 'listening')->avg('score'));
-        $readingOverall = $this->toPercent((float) $submissions->filter(fn ($s) => $s->exercise?->type === 'reading')->avg('score'));
+        $speakingOverall = $this->toPercent((float) $submissions->filter(fn ($s) => in_array($s->exercise?->type, ['speaking', 'reading'], true))->avg('score'));
 
         $insights = [
             $overallAccuracy >= 80
                 ? 'Overall accuracy is strong. Your current training approach is working.'
                 : 'Overall accuracy can still be improved. Prioritize reviewing incorrect questions.',
-            abs($listeningOverall - $readingOverall) <= 8
-                ? 'Listening and reading are balanced. Your skill profile is relatively stable.'
-                : ($listeningOverall > $readingOverall
-                    ? 'Listening is stronger than reading. Consider adding more intensive reading practice.'
-                    : 'Reading is stronger than listening. Consider adding more intensive listening practice.'),
+            abs($listeningOverall - $speakingOverall) <= 8
+                ? 'Listening and speaking are balanced. Your skill profile is relatively stable.'
+                : ($listeningOverall > $speakingOverall
+                    ? 'Listening is stronger than speaking. Consider adding more intensive speaking practice.'
+                    : 'Speaking is stronger than listening. Consider adding more intensive listening practice.'),
             $efficiencyIndex >= 1.5
                 ? 'Learning efficiency is high. You are getting solid output per study hour.'
                 : 'Learning efficiency is low. Try shortening single study sessions and increasing focus.',
@@ -267,7 +267,7 @@ class AnalysisController extends Controller
         return [
             'overall_accuracy_trend' => $overallAccuracyTrend,
             'listening_accuracy_trend' => $listeningTrend,
-            'reading_accuracy_trend' => $readingTrend,
+            'speaking_accuracy_trend' => $speakingTrend,
             'completed_exercises' => $completedExercises,
             'efficiency_index' => $efficiencyIndex,
             'insights' => $insights,
@@ -309,7 +309,7 @@ class AnalysisController extends Controller
             ->leftJoin('articles', 'submissions.article_id', '=', 'articles.id')
             ->where('submissions.user_id', $userId)
             ->whereBetween('submissions.created_at', [$startAt, $endAt])
-            ->whereIn('exercises.type', ['listening', 'reading'])
+            ->whereIn('exercises.type', ['listening', 'speaking', 'reading'])
             ->select([
                 'submissions.score',
                 'submissions.time_spent',
@@ -322,23 +322,25 @@ class AnalysisController extends Controller
             ->get();
 
         $listeningRows = $rows->where('exercise_type', 'listening')->values();
-        $readingRows = $rows->where('exercise_type', 'reading')->values();
+        $speakingRows = $rows
+            ->filter(fn ($row) => in_array($row->exercise_type, ['speaking', 'reading'], true))
+            ->values();
 
         $listening = $this->buildSingleDiagnosis(
             rows: $listeningRows,
             type: 'listening'
         );
 
-        $reading = $this->buildSingleDiagnosis(
-            rows: $readingRows,
-            type: 'reading'
+        $speaking = $this->buildSingleDiagnosis(
+            rows: $speakingRows,
+            type: 'speaking'
         );
 
-        $topIssues = $this->buildTopIssues($listening, $reading);
+        $topIssues = $this->buildTopIssues($listening, $speaking);
 
         return [
             'listening' => $listening,
-            'reading' => $reading,
+            'speaking' => $speaking,
             'top_issues' => $topIssues,
         ];
     }
@@ -510,7 +512,7 @@ class AnalysisController extends Controller
                     : 'Prioritize fixing the most frequent error types and build a personal error log.',
             ]
             : [
-                'Add paragraph main‑idea identification and logic‑chain annotation to your reading practice.',
+                'Add paragraph main‑idea identification and logic‑chain annotation to your speaking practice.',
                 $primaryType
                     ? "Focus on reducing \"{$primaryType}\". After each session, replay and review similar errors."
                     : 'Prioritize fixing the most frequent error types and build a personal error log.',
@@ -519,12 +521,12 @@ class AnalysisController extends Controller
         return array_values(array_unique(array_merge($common, $typeSpecific)));
     }
 
-    private function buildTopIssues(array $listening, array $reading): array
+    private function buildTopIssues(array $listening, array $speaking): array
     {
         $pool = collect();
 
-        foreach ([$listening, $reading] as $module) {
-            $typeLabel = $module['exercise_type'] === 'listening' ? 'Listening' : 'Reading';
+        foreach ([$listening, $speaking] as $module) {
+            $typeLabel = $module['exercise_type'] === 'listening' ? 'Listening' : 'Speaking';
 
             foreach ($module['error_type_distribution'] as $item) {
                 $pool->push([
@@ -551,10 +553,10 @@ class AnalysisController extends Controller
                     'suggested_action' => 'Do one set of listening error review every day and record the trigger for each mistake.',
                 ],
                 [
-                    'module' => 'Reading',
-                    'issue' => 'Unstable key‑information location',
-                    'impact_score' => $reading['error_rate'] ?? 0,
-                    'suggested_action' => 'For each passage, mark the structure before answering to speed up locating key information.',
+                    'module' => 'Speaking',
+                    'issue' => 'Unstable key‑information expression',
+                    'impact_score' => $speaking['error_rate'] ?? 0,
+                    'suggested_action' => 'For each speaking task, outline key points first and deliver the answer with one clear structure.',
                 ],
                 [
                     'module' => 'Overall',
@@ -588,7 +590,7 @@ class AnalysisController extends Controller
         }
 
         if (str_contains($issueLower, '主旨') || str_contains($issueLower, '指代')) {
-            return "For {$moduleLabel} passages, mark the topic sentences and reference targets before answering questions.";
+            return "For {$moduleLabel} responses, mark the topic points and reference targets before delivering the answer.";
         }
 
         return "After each {$moduleLabel} session, review this issue and complete one focused reinforcement set.";
