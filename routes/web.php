@@ -16,6 +16,7 @@ use App\Http\Controllers\ReadingQuestionAttemptController;
 use App\Http\Controllers\SelectionTranslationController;
 use App\Http\Controllers\SpeakingVideoCallController;
 use App\Http\Controllers\WritingTrainingController;
+use App\Services\CompanionService;
 use App\Models\Article;
 use App\Models\CompanionInventory;
 use App\Models\CompanionProfile;
@@ -257,6 +258,31 @@ Route::get('/', function (Request $request) {
         'transactions' => $companionTransactions,
     ];
 
+    $ownedBadges = collect();
+    if ($companionProfile->equipped_shop_item_id) {
+        $ownedBadges = CompanionInventory::query()
+            ->with('item')
+            ->where('user_id', $user->id)
+            ->where('quantity', '>', 0)
+            ->where('shop_item_id', (int) $companionProfile->equipped_shop_item_id)
+            ->whereHas('item', fn ($query) => $query->where('type', 'item')->where('is_active', true))
+            ->latest('id')
+            ->get()
+            ->map(function (CompanionInventory $inventory) {
+                $item = $inventory->item;
+
+                return [
+                    'id' => $item?->id,
+                    'name' => $item?->name,
+                    'rarity' => $item?->rarity,
+                    'visual' => $item?->visual ?? [],
+                ];
+            })
+            ->filter(fn (array $badge) => ! empty($badge['id']))
+            ->values();
+    }
+
+
     $favoritePlanArticles = Article::query()
         ->join('user_favorites', 'articles.id', '=', 'user_favorites.article_id')
         ->where('user_favorites.user_id', $user->id)
@@ -367,6 +393,7 @@ Route::get('/', function (Request $request) {
         'calendarCheckins',
         'checkinSummary',
         'pointsSummary',
+        'ownedBadges',
         'selectedTasks',
         'overdueTasks',
         'weeklySummary',
@@ -397,8 +424,47 @@ Route::get('/game', function () {
         ->values()
         ->all();
 
-    return view('games.wordle', compact('words'));
+    $wordleRewardAmount = 12;
+
+    return view('games.wordle', compact('words', 'wordleRewardAmount'));
 })->name('game.index')->middleware('auth');
+
+Route::post('/games/wordle/reward', function (Request $request, CompanionService $companionService) {
+    $validated = $request->validate([
+        'won' => 'required|boolean',
+    ]);
+
+    if (! $validated['won']) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Reward can only be granted after a win.',
+        ], 422);
+    }
+
+    $userId = (int) auth()->id();
+    $amount = 12;
+    $today = now()->toDateString();
+
+    $reward = $companionService->grantCoins(
+        userId: $userId,
+        amount: $amount,
+        source: 'wordle_complete',
+        rewardKey: 'game:wordle:'.$today,
+        meta: [
+            'game' => 'wordle',
+            'date' => $today,
+        ]
+    );
+
+    return response()->json([
+        'success' => true,
+        'awarded' => (bool) ($reward['awarded'] ?? false),
+        'amount' => (int) ($reward['amount'] ?? 0),
+        'message' => ($reward['awarded'] ?? false)
+            ? 'Wordle reward granted.'
+            : 'Wordle reward already claimed today.',
+    ]);
+})->name('games.wordle.reward')->middleware('auth');
 
 Route::delete('/plans/{plan}', function (UserPlan $plan) {
     if ($plan->user_id !== auth()->id()) {
@@ -708,6 +774,7 @@ Route::post('/favorites/plan', [FavoritesController::class, 'storePlan'])->name(
 Route::get('/shop', [CompanionController::class, 'index'])->name('shop.index')->middleware('auth');
 Route::post('/shop/items/{item}/purchase', [CompanionController::class, 'purchase'])->name('shop.purchase')->middleware('auth');
 Route::post('/shop/items/{item}/equip', [CompanionController::class, 'equip'])->name('shop.equip')->middleware('auth');
+Route::post('/shop/items/unequip', [CompanionController::class, 'unequip'])->name('shop.unequip')->middleware('auth');
 Route::post('/shop/check-in', [CompanionController::class, 'checkIn'])->name('shop.check-in')->middleware('auth');
 Route::post('/shop/check-in/makeup', [CompanionController::class, 'useMakeupCard'])->name('shop.check-in.makeup')->middleware('auth');
 Route::get('/companion', fn () => redirect()->route('shop.index'))->name('companion.index')->middleware('auth');

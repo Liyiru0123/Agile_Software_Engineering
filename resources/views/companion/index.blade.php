@@ -48,12 +48,7 @@
     $consumables = collect($shopItems)->where('type', 'consumable')->values();
     $outfits = collect($shopItems)->where('type', 'outfit')->values();
     $items = collect($shopItems)->where('type', 'item')->values();
-    $badges = $items
-        ->filter(fn (array $item) => str_contains((string) ($item['slug'] ?? ''), 'badge'))
-        ->values();
-    $displayItems = $items
-        ->reject(fn (array $item) => str_contains((string) ($item['slug'] ?? ''), 'badge'))
-        ->values();
+    $achievements = collect($achievements ?? []);
     $shopIcon = function (array $item): string {
         $slug = (string) ($item['slug'] ?? '');
         $type = (string) ($item['type'] ?? 'item');
@@ -65,16 +60,13 @@
             default => '<svg class="h-10 w-10" viewBox="0 0 48 48" fill="none"><rect x="11" y="9" width="26" height="30" rx="7" fill="#FFF8F0" stroke="#6B3D2E" stroke-width="3"/><path d="M18 18H30" stroke="#6B3D2E" stroke-width="3" stroke-linecap="round"/><path d="M18 24H30" stroke="#D4B970" stroke-width="3" stroke-linecap="round"/><path d="M18 30H26" stroke="#D88C5A" stroke-width="3" stroke-linecap="round"/></svg>',
         };
     };
-    $badgeIcon = function (array $item): string {
-        $slug = (string) ($item['slug'] ?? '');
+    $badgeIcon = function (array $achievement): string {
+        $key = (string) ($achievement['key'] ?? '');
 
         return match (true) {
-            str_contains($slug, 'writing') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 15l7-7 3 3-7 7H7v-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
-            str_contains($slug, 'reading') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M4 6a3 3 0 0 1 3-3h5v16H7a3 3 0 0 0-3 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M20 6a3 3 0 0 0-3-3h-5v16h5a3 3 0 0 1 3 3V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
-            str_contains($slug, 'listening') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M4 10h3l4-4v12l-4-4H4v-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 9c1.4 1.4 1.4 4.6 0 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M18 7c2.6 2.6 2.6 7.4 0 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
-            str_contains($slug, 'forum') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v10H7l-3 3V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
-            str_contains($slug, 'night') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M15 4a8 8 0 1 0 5 14.5A7 7 0 0 1 15 4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
-            str_contains($slug, 'streak') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M12 3c-2 3-3 4.5-3 7a6 6 0 1 0 12 0c0-2-1-3.5-3-6-1 2-2 3-4 4-.2-1.5-.2-2.5-2-5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+            str_contains($key, 'listening') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M4 10h3l4-4v12l-4-4H4v-4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 9c1.4 1.4 1.4 4.6 0 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M18 7c2.6 2.6 2.6 7.4 0 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+            str_contains($key, 'checkin_streak_30') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M12 3c-2 3-3 4.5-3 7a6 6 0 1 0 12 0c0-2-1-3.5-3-6-1 2-2 3-4 4-.2-1.5-.2-2.5-2-5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 20h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+            str_contains($key, 'checkin_streak_7') => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M12 3c-2 3-3 4.5-3 7a6 6 0 1 0 12 0c0-2-1-3.5-3-6-1 2-2 3-4 4-.2-1.5-.2-2.5-2-5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
             default => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4L4.2 8.7l5.4-.8L12 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
         };
     };
@@ -103,27 +95,90 @@
         @endif
 
         <section class="rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 sm:p-8 shadow-sm">
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-                <h2 class="text-2xl font-black text-[#4A2C2A]">Badge Wall</h2>
-                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-[#8B6B47]">Owned = Dark / Locked = Light</p>
+            <div class="flex items-center gap-3 flex-wrap">
+                <h2 class="text-2xl font-black text-[#4A2C2A]">Titles</h2>
             </div>
-            <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                @forelse($badges as $badge)
-                    @php($owned = (bool) ($badge['owned'] ?? false))
-                    <div class="rounded-2xl border px-3 py-3 transition {{ $owned ? 'border-[#6B3D2E] bg-[#6B3D2E] text-[#FDF7EE] shadow-md' : 'border-[#E2D2BF] bg-[#F7EFE4] text-[#A28A73]' }}">
-                        <div class="inline-flex h-9 w-9 items-center justify-center rounded-full {{ $owned ? 'bg-[#F6D8A8] text-[#4A2C2A]' : 'bg-[#EFE4D5] text-[#B7A38E]' }}">
-                            {!! $badgeIcon($badge) !!}
+            <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                @forelse($achievements as $achievement)
+                    @php($unlocked = (bool) ($achievement['unlocked'] ?? false))
+                    <div class="rounded-2xl border px-4 py-4 transition {{ $unlocked ? 'border-[#6B3D2E] bg-[#6B3D2E] text-[#FDF7EE] shadow-md' : 'border-[#E2D2BF] bg-[#F7EFE4] text-[#7F6B57]' }}">
+                        <div class="inline-flex h-9 w-9 items-center justify-center rounded-full {{ $unlocked ? 'bg-[#F6D8A8] text-[#4A2C2A]' : 'bg-[#EFE4D5] text-[#A99580]' }}">
+                            {!! $badgeIcon($achievement) !!}
                         </div>
-                        <div class="mt-2 text-xs font-bold leading-5">{{ $badge['name'] }}</div>
+                        <div class="mt-2 text-sm font-bold leading-6">{{ $achievement['name'] }}</div>
+                        <div class="mt-1 text-xs leading-5 opacity-85">{{ $achievement['description'] }}</div>
                     </div>
                 @empty
                     <div class="col-span-full rounded-2xl border border-dashed border-[#D8C3A6] bg-[#FBF4EA] px-4 py-4 text-sm text-[#8B6B47]">
-                        No badge items yet.
+                        No titles yet.
                     </div>
                 @endforelse
             </div>
         </section>
 
+        <section class="mt-8 rounded-[2rem] border border-[#E6D3BC] bg-[#FDF7EE] p-6 sm:p-8 shadow-sm">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <h2 class="text-2xl font-black text-[#4A2C2A]">Badge Wall</h2>
+                    <p class="mt-1 text-sm text-[#8B6B47]">Collect badges to light up your wall. Unowned badges can be purchased here.</p>
+                </div>
+            </div>
+
+            <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                @forelse($items as $item)
+                    @php($isOwned = (bool) ($item['owned'] ?? false))
+                    <article class="rounded-2xl border px-3 py-3 transition {{ $isOwned ? 'border-[#D4B970] bg-[#FFF6DC] text-[#4A2C2A] shadow-sm' : 'border-[#E2D2BF] bg-[#F7EFE4] text-[#8B6B47]' }}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/85 {{ $isOwned ? 'shadow-sm' : 'opacity-65' }}">
+                                {!! $shopIcon($item) !!}
+                            </div>
+                            <div class="text-right leading-none">
+                                <div class="text-[10px] uppercase tracking-[0.12em] text-[#8B6B47]">Price</div>
+                                <div class="mt-1 text-lg font-black text-[#4A2C2A]">{{ $item['price'] }}</div>
+                            </div>
+                        </div>
+
+                        <h3 class="mt-2 text-sm font-black leading-5">{{ $item['name'] }}</h3>
+
+                        <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                            <span class="rounded-full border border-[#D9C6A8] px-2 py-0.5">{{ ucfirst($item['rarity']) }}</span>
+                            @if($isOwned)
+                                <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">Lit</span>
+                            @endif
+                        </div>
+
+                        <div class="mt-3">
+                            @if(! $isOwned)
+                                <form method="POST" action="{{ route('shop.purchase', $item['id']) }}">
+                                    @csrf
+                                    <button type="submit" class="w-full rounded-xl bg-[#4A2C2A] px-3 py-2 text-xs font-semibold text-[#F5E6D3] transition hover:bg-[#6B3D2E]">
+                                        Buy Badge
+                                    </button>
+                                </form>
+                            @elseif(! $item['equipped'])
+                                <form method="POST" action="{{ route('shop.equip', $item['id']) }}">
+                                    @csrf
+                                    <button type="submit" class="w-full rounded-xl border border-[#C9A961] bg-[#FFF8ED] px-3 py-2 text-xs font-semibold text-[#6B3D2E] transition hover:bg-[#F6EAD8]">
+                                        Wear Badge Style
+                                    </button>
+                                </form>
+                            @else
+                                <form method="POST" action="{{ route('shop.unequip') }}">
+                                    @csrf
+                                    <button type="submit" class="w-full rounded-xl border border-[#C95F43] bg-[#FBE4DB] px-3 py-2 text-xs font-semibold text-[#7A2F1F] transition hover:bg-[#F6D4C7]">
+                                        Remove Badge Style
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </article>
+                @empty
+                    <div class="col-span-full rounded-2xl border border-dashed border-[#D8C3A6] bg-[#FBF4EA] px-4 py-4 text-sm text-[#8B6B47]">
+                        No badges available.
+                    </div>
+                @endforelse
+            </div>
+        </section>
 
         <section class="mt-8 space-y-8">
             <div>
@@ -211,43 +266,6 @@
                             @else
                                 <div class="rounded-2xl border border-[#D8C3A6] bg-white/70 px-4 py-3 text-sm font-semibold text-[#8B6B47]">
                                     Currently equipped
-                                </div>
-                            @endif
-                        </div>
-                    </article>
-                @endforeach
-                @foreach($displayItems as $item)
-                    <article class="rounded-[2rem] border border-[#E2CFB3] p-5 shadow-sm" style="background-color: {{ data_get($item, 'visual.surface', '#F9EFE2') }};">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-white/80 shadow-sm">{!! $shopIcon($item) !!}</div>
-                                <h3 class="mt-3 text-xl font-black text-[#4A2C2A]">{{ $item['name'] }}</h3>
-                                <p class="mt-2 text-sm leading-7 text-[#6B3D2E]">{{ $item['description'] }}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-[11px] uppercase tracking-[0.14em] text-[#8B6B47]">Price</div>
-                                <div class="mt-1 text-2xl font-black text-[#4A2C2A]">{{ $item['price'] }}</div>
-                            </div>
-                        </div>
-
-                        <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-[#8B6B47]">
-                            <span class="rounded-full border border-[#D9C6A8] px-2.5 py-1">{{ ucfirst($item['rarity']) }}</span>
-                            @if($item['owned'])
-                                <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">Owned</span>
-                            @endif
-                        </div>
-
-                        <div class="mt-5 flex flex-wrap gap-3">
-                            @if(! $item['owned'])
-                                <form method="POST" action="{{ route('shop.purchase', $item['id']) }}">
-                                    @csrf
-                                    <button type="submit" class="rounded-2xl bg-[#4A2C2A] px-4 py-3 text-sm font-semibold text-[#F5E6D3] transition hover:bg-[#6B3D2E]">
-                                        Buy Item
-                                    </button>
-                                </form>
-                            @else
-                                <div class="rounded-2xl border border-[#D8C3A6] bg-white/70 px-4 py-3 text-sm font-semibold text-[#8B6B47]">
-                                    Already collected
                                 </div>
                             @endif
                         </div>

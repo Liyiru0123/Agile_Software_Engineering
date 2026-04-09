@@ -55,6 +55,7 @@
                     New Game
                 </button>
                 <p class="text-xs text-[#8B6B5A]">Tip: Use your keyboard or click letters below.</p>
+                <p class="text-xs font-semibold text-emerald-700">Win once per day to get +{{ $wordleRewardAmount ?? 12 }} gold.</p>
             </div>
         </div>
     </div>
@@ -308,12 +309,15 @@
     const MAX_ROWS = 6;
     const MAX_COLS = 5;
     const KEY_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ENTERZXCVBNMDEL'];
+    const rewardEndpoint = @json(route('games.wordle.reward'));
+    const rewardAmount = @json($wordleRewardAmount ?? 12);
 
     let target = '';
     let row = 0;
     let col = 0;
     let guesses = [];
     let gameOver = false;
+    let rewardRequested = false;
 
     function randomWord() {
         const pool = WORDS.length ? WORDS : FALLBACK_WORDS;
@@ -373,6 +377,43 @@
 
     function updateStatus(message) {
         statusEl.textContent = message;
+    }
+
+    async function requestWinReward() {
+        if (rewardRequested) {
+            return;
+        }
+
+        rewardRequested = true;
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const response = await fetch(rewardEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ won: true }),
+            });
+
+            const payload = await response.json();
+
+            if (response.ok && payload?.awarded) {
+                updateStatus('You win! The word was ' + target + '. +' + rewardAmount + ' gold earned.');
+                return;
+            }
+
+            if (response.ok) {
+                updateStatus('You win! The word was ' + target + '. Reward already claimed today.');
+                return;
+            }
+
+            updateStatus('You win! The word was ' + target + '. Reward request failed.');
+        } catch (error) {
+            updateStatus('You win! The word was ' + target + '. Reward request failed.');
+        }
     }
 
     function paintKey(letter, cls) {
@@ -457,7 +498,7 @@
 
         if (guess === target) {
             gameOver = true;
-            updateStatus('You win! The word was ' + target + '.');
+            void requestWinReward();
             return;
         }
 
@@ -542,6 +583,7 @@
         row = 0;
         col = 0;
         gameOver = false;
+        rewardRequested = false;
         guesses = Array.from({ length: MAX_ROWS }, () => Array(MAX_COLS).fill(''));
 
         buildBoard();
