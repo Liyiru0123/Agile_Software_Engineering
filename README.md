@@ -264,10 +264,11 @@ php artisan test
 | Sword_Holder      | Jiarui Zheng |
 | MidsummerFantasia | Wentong Yang |
 | Phrxey            | Zijian Cao   |
-| Superb            | Guijian Yuan |
+| Superb            | Jianyuan Gui |
 | FDG-ANSWER        | Sihan Huang  |
 | Liyiru0123        | Yiru Li      |
 | Zzx0112-zeri      | Zhixin Zhu   |
+| jiojioYize        | Yize Xiao    |
 
 ---
 
